@@ -9,6 +9,7 @@ A responsive chat application built with Flask, the Anthropic Python SDK, React,
 - Render assistant replies as Markdown, including code blocks, links, and lists
 - Use Anthropic or OpenRouter credentials
 - Share core chat logic between the Flask API and CLI
+- Persist web chat sessions in DuckDB
 
 ## Project structure
 
@@ -18,9 +19,10 @@ cli/         Terminal chat client
 core/        Shared session storage, settings, and model service
 frontend/    Vite + React browser interface
 tests/       Python unit and API tests
+data/        Local DuckDB database directory, created at runtime
 ```
 
-Chat sessions are currently held in memory. They reset when the backend restarts; use a database-backed store before production use.
+The web application stores sessions in DuckDB. The default database path is `data/chat.duckdb`, so sessions survive backend restarts on the same machine.
 
 ## Requirements
 
@@ -53,6 +55,7 @@ For direct Anthropic access:
 AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=your_anthropic_key
 CLAUDE_MODEL=claude-sonnet-4-5
+CHAT_DATABASE_PATH=data/chat.duckdb
 ```
 
 For OpenRouter access through the Anthropic SDK:
@@ -61,6 +64,7 @@ For OpenRouter access through the Anthropic SDK:
 AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=your_openrouter_key
 CLAUDE_MODEL=anthropic/claude-sonnet-4.5
+CHAT_DATABASE_PATH=data/chat.duckdb
 ```
 
 `python-dotenv` loads `.env` for local runs. Real environment variables take precedence, so deployment secrets override local values.
@@ -70,7 +74,7 @@ CLAUDE_MODEL=anthropic/claude-sonnet-4.5
 Start the Flask API from the repository root:
 
 ```bash
-uv run flask --app backend.app:create_app run --debug --port 5000
+uv run flask --app backend.app.wsgi:app run --debug --no-reload --port 5000
 ```
 
 In a separate terminal, start the frontend:
@@ -81,6 +85,8 @@ npm run dev
 ```
 
 Open the displayed Vite URL, normally `http://localhost:5173`. The Vite development server proxies browser requests from `/api` to Flask at `http://127.0.0.1:5000`.
+
+DuckDB holds a write lock on its database file. Flask's debug reloader starts a second process, which would compete for that lock, so use `--no-reload`. Stop any existing Flask process before starting another server against the same database file.
 
 ## Run the terminal client
 
@@ -123,13 +129,15 @@ npm run build
 
 Deploy `frontend/dist/` to a static host, CDN, or reverse proxy. Configure it to serve the frontend and route `/api` requests to the Flask service.
 
-Set `AI_PROVIDER`, the provider-specific API key, and `CLAUDE_MODEL` through your hosting platform's secret manager. Do not upload a `.env` file to production.
+Set `AI_PROVIDER`, the provider-specific API key, `CLAUDE_MODEL`, and `CHAT_DATABASE_PATH` through your hosting platform's secret manager. Do not upload a `.env` file to production. Store the DuckDB file on persistent storage; ephemeral filesystem storage will erase sessions when the deployment restarts.
 
 Run the Flask application with Gunicorn:
 
 ```bash
 uv sync --frozen
-uv run gunicorn --workers 2 --bind 0.0.0.0:5000 backend.app.wsgi:app
+uv run gunicorn --workers 1 --bind 0.0.0.0:5000 backend.app.wsgi:app
 ```
 
-Place Gunicorn behind an HTTPS-terminating reverse proxy. Before public release, add authentication, rate limiting, restricted CORS origins, observability, backups, and durable user-scoped session storage.
+DuckDB is appropriate for one backend process. Do not run multiple Gunicorn workers or multiple application instances against the same write-enabled DuckDB file. For horizontal scaling or higher write concurrency, migrate session storage to PostgreSQL.
+
+Place Gunicorn behind an HTTPS-terminating reverse proxy. Before public release, add authentication, rate limiting, restricted CORS origins, observability, and backups.

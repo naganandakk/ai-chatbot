@@ -1,13 +1,9 @@
-from pathlib import Path
-import os
 from collections.abc import Iterator
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
 
+from .settings import Settings
 from .store import SessionStore
-
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
 class ChatService:
@@ -15,11 +11,11 @@ class ChatService:
         self,
         store: SessionStore,
         client: Anthropic | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.store = store
         self.client = client
-        self.provider = self._provider()
-        self.model = os.getenv("CLAUDE_MODEL", self._default_model())
+        self.settings = settings
 
     def stream_reply(self, session_id: str, prompt: str) -> Iterator[str]:
         message = prompt.strip()
@@ -36,9 +32,10 @@ class ChatService:
             {"role": chat_message.role, "content": chat_message.content}
             for chat_message in session.messages
         ]
+        settings = self._settings()
 
-        response = self._client().messages.create(
-            model=self.model,
+        response = self._client(settings).messages.create(
+            model=settings.model,
             max_tokens=2048,
             messages=conversation,
             stream=True,
@@ -53,37 +50,27 @@ class ChatService:
 
         self.store.add_message(session_id, "assistant", "".join(chunks))
 
-    def _client(self) -> Anthropic:
+    def _client(self, settings: Settings) -> Anthropic:
         if self.client is not None:
             return self.client
 
-        if self.provider == "openrouter":
-            api_key = os.getenv("OPENROUTER_API_KEY")
-            if not api_key:
-                raise RuntimeError("OPENROUTER_API_KEY is required for OpenRouter")
-
+        if settings.provider == "openrouter":
             return Anthropic(
-                api_key=api_key,
+                api_key=settings.api_key,
                 base_url="https://openrouter.ai/api",
             )
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY is required for Anthropic")
+        return Anthropic(api_key=settings.api_key)
 
-        return Anthropic(api_key=api_key)
+    def _settings(self) -> Settings:
+        if self.settings is not None:
+            return self.settings
 
-    @staticmethod
-    def _provider() -> str:
-        provider = os.getenv("AI_PROVIDER", "").lower()
+        if self.client is not None:
+            return Settings(
+                provider="anthropic",
+                api_key="test-key",
+                model="test-model",
+            )
 
-        if provider in {"anthropic", "openrouter"}:
-            return provider
-
-        return "openrouter" if os.getenv("OPENROUTER_API_KEY") else "anthropic"
-
-    def _default_model(self) -> str:
-        if self.provider == "openrouter":
-            return "anthropic/claude-haiku-4.5"
-
-        return "claude-haiku-4-5"
+        return Settings.from_env()

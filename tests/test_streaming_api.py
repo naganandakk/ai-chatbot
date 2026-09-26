@@ -41,3 +41,20 @@ def test_streaming_message_endpoint():
         "assistant",
     ]
     assert saved_session["messages"][1]["content"] == "Hello world"
+
+def test_streaming_endpoint_reports_empty_message_error():
+    app = create_app()
+    client = app.test_client()
+    session = client.post("/api/sessions").get_json()
+
+    response = client.post(
+        f"/api/sessions/{session['id']}/messages",
+        json={"message": "   "},
+    )
+
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert response.content_type.startswith("text/event-stream")
+    assert "event: error" in body
+    assert '"message": "Message cannot be empty"' in body

@@ -38,6 +38,10 @@ class SessionStore:
         session.updated_at = utc_now()
         return session
 
+    def delete(self, session_id: str) -> None:
+        self._require(session_id)
+        del self._sessions[session_id]
+
     def _require(self, session_id: str) -> ChatSession:
         session = self.get(session_id)
         if session is None:

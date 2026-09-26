@@ -54,6 +54,26 @@ def create_app(
 
         return jsonify(session.to_dict())
 
+    @app.delete("/api/sessions/<session_id>")
+    def delete_session(session_id: str):
+        try:
+            session_store.delete(session_id)
+        except KeyError:
+            return jsonify({"error": "Session not found"}), 404
+
+        return jsonify({"message": "Session deleted successfully"})
+
+    @app.put("/api/sessions/<session_id>")
+    def update_session(session_id: str):
+        payload = request.get_json(silent=True) or {}
+        title = payload.get("title", "New Chat")
+        try:
+            session = session_store.update(session_id, title)
+        except KeyError:
+            return jsonify({"error": "Session not found"}), 404
+
+        return jsonify(session.to_dict())
+
     @app.post("/api/sessions/<session_id>/messages")
     def send_message(session_id: str):
         payload = request.get_json(silent=True) or {}

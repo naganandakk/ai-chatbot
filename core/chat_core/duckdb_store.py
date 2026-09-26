@@ -144,6 +144,37 @@ class DuckDBSessionStore:
 
         return cleared_session
 
+    def delete(self, session_id: str) -> None:
+        self._require(session_id)
+
+        self.connection.execute(
+            "DELETE FROM chat_messages WHERE session_id = ?",
+            [session_id],
+        )
+        self.connection.execute(
+            "DELETE FROM chat_sessions WHERE id = ?",
+            [session_id],
+        )
+
+    def update(self, session_id: str, title: str) -> ChatSession:
+        self._require(session_id)
+
+        self.connection.execute(
+            """
+            UPDATE chat_sessions
+            SET title = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            [title, utc_now(), session_id],
+        )
+
+        renamed_session = self.get(session_id)
+
+        if renamed_session is None:
+            raise KeyError(f"Session not found: {session_id}")
+
+        return renamed_session
+
     def close(self) -> None:
         self.connection.close()
 

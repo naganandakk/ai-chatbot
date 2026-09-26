@@ -184,3 +184,71 @@ button:disabled {
     padding: 22px 0;
   }
 }
+
+.clear {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #34333f;
+}
+
+.clear:hover {
+  background: #4a4657;
+}
+
+.message-content {
+  min-width: 0;
+  line-height: 1.6;
+}
+
+.message-content > :first-child {
+  margin-top: 0;
+}
+
+.message-content > :last-child {
+  margin-bottom: 0;
+}
+
+.message-content ul,
+.message-content ol {
+  padding-left: 24px;
+}
+
+.message-content li + li {
+  margin-top: 4px;
+}
+
+.message-content blockquote {
+  margin-left: 0;
+  padding-left: 14px;
+  border-left: 3px solid #d97757;
+  color: #c8c6d0;
+}
+
+.message-content pre {
+  overflow-x: auto;
+  padding: 14px;
+  border-radius: 8px;
+  background: #0f0e12;
+}
+
+.message-content code {
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #2b2933;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.message-content pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.message-content a {
+  color: #f19a79;
+}
+
+.error {
+  margin: 8px 0;
+  color: #ff9a8a;
+}

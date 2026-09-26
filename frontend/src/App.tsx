@@ -1,7 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
 import { api, ChatSession, Message, SessionSummary } from "./api";
 
 export default function App() {
@@ -10,6 +9,8 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   async function refreshSessions() {
     try {
@@ -81,6 +82,17 @@ export default function App() {
     }
   }
 
+  function resizeComposer() {
+    const textarea = composerRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }
+
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
 
@@ -109,6 +121,7 @@ export default function App() {
       };
 
       setDraft("");
+      resizeComposer();
       setIsStreaming(true);
       setActiveSession({
         ...session,
@@ -148,11 +161,21 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
+      <button
+        aria-label="Close sidebar"
+        className={isSidebarOpen ? "sidebar-backdrop is-visible" : "sidebar-backdrop"}
+        onClick={() => setIsSidebarOpen(false)}
+        type="button"
+      />
+
+      <aside className={isSidebarOpen ? "sidebar is-open" : "sidebar"}>
         <button
           className="new-chat"
           disabled={isStreaming}
-          onClick={() => void createSession()}
+          onClick={() => {
+            void createSession();
+            setIsSidebarOpen(false);
+          }}
           type="button"
         >
           + New chat
@@ -166,7 +189,10 @@ export default function App() {
               }
               disabled={isStreaming}
               key={session.id}
-              onClick={() => void openSession(session.id)}
+              onClick={() => {
+                void openSession(session.id);
+                setIsSidebarOpen(false);
+              }}
               type="button"
             >
               {session.title}
@@ -177,6 +203,14 @@ export default function App() {
 
       <section className="chat">
         <header className="chat-header">
+          <button
+              aria-label="Open sidebar"
+              className="sidebar-toggle"
+              onClick={() => setIsSidebarOpen(true)}
+              type="button"
+           >
+            ☰
+          </button>
           <div>
             <span className="eyebrow">AI CHAT</span>
             <h1>{activeSession?.title ?? "Start a conversation"}</h1>
@@ -232,19 +266,23 @@ export default function App() {
 
         <form className="composer" onSubmit={(event) => void sendMessage(event)}>
           <textarea
-            aria-label="Message"
-            disabled={isStreaming}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void sendMessage(event);
-              }
-            }}
-            placeholder="Message AI…"
-            rows={1}
-            value={draft}
-          />
+              aria-label="Message"
+              disabled={isStreaming}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                resizeComposer();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendMessage(event);
+                }
+              }}
+              placeholder="Message AI…"
+              ref={composerRef}
+              rows={1}
+              value={draft}
+            />
 
           <button disabled={isStreaming || !draft.trim()} type="submit">
             {isStreaming ? "Thinking…" : "Send"}

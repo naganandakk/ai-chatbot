@@ -10,6 +10,7 @@ dependencies = [
   "flask-cors>=5.0.0",
   "gunicorn>=23.0.0",
   "python-dotenv>=1.0.1",
+  "duckdb>=1.5.5",
 ]
 
 [dependency-groups]

@@ -12,6 +12,7 @@ class Settings:
     provider: str
     api_key: str
     model: str
+    database_path: str = "data/chat.duckdb"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -38,9 +39,11 @@ class Settings:
             else "claude-haiku-4-5"
         )
         model = os.getenv("CLAUDE_MODEL", default_model)
+        database_path = os.getenv("CHAT_DATABASE_PATH", "data/chat.duckdb")
 
         return cls(
             provider=provider,
             api_key=api_key,
             model=model,
+            database_path=database_path,
         )

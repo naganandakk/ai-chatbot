@@ -35,3 +35,12 @@ def test_rejects_missing_provider(monkeypatch):
         match="AI_PROVIDER must be set to 'anthropic' or 'openrouter'",
     ):
         Settings.from_env()
+
+def test_loads_database_path(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    monkeypatch.setenv("CHAT_DATABASE_PATH", "tmp/test-chat.duckdb")
+
+    settings = Settings.from_env()
+
+    assert settings.database_path == "tmp/test-chat.duckdb"

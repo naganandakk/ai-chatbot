@@ -3,12 +3,13 @@ import json
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
+from core.chat_core.duckdb_store import DuckDBSessionStore
 from core.chat_core.service import ChatService
 from core.chat_core.store import SessionStore
 
 
 def create_app(
-    store: SessionStore | None = None,
+    store: SessionStore | DuckDBSessionStore | None = None,
     chat_service: ChatService | None = None,
 ) -> Flask:
     app = Flask(__name__)

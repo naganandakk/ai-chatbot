@@ -15,6 +15,10 @@ export type ChatSession = SessionSummary & {
   messages: Message[];
 };
 
+export type ConfirmationMessage = {
+  message: string
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit,
@@ -103,6 +107,16 @@ export const api = {
   clearSession: (sessionId: string) =>
     request<ChatSession>(`/sessions/${sessionId}/messages`, {
       method: "DELETE",
+    }),
+
+  deleteSession: (sessionId: string) =>
+    request<ConfirmationMessage>(`/sessions/${sessionId}`, {
+      method: "DELETE",
+    }),
+
+  renameSession: (sessionId: string) =>
+    request<ChatSession>(`/sessions/${sessionId}`, {
+      method: "PUT",
     }),
 
   streamMessage,

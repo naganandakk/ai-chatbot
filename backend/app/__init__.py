@@ -72,7 +72,7 @@ def create_app(
         except KeyError:
             return jsonify({"error": "Session not found"}), 404
 
-        return jsonify(session.to_dict())
+        return jsonify(session.to_dict(include_messages=False))
 
     @app.post("/api/sessions/<session_id>/messages")
     def send_message(session_id: str):

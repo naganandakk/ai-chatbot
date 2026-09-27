@@ -82,6 +82,25 @@ export default function App() {
     }
   }
 
+  async function deleteSession() {
+    if (!activeSession || isStreaming) {
+      return;
+    }
+
+    try {
+      setError("");
+      await api.deleteSession(activeSession.id);
+      setActiveSession(null);
+      await refreshSessions();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not delete the session",
+      );
+    }
+  }
+
   function resizeComposer() {
     const textarea = composerRef.current;
 
@@ -224,6 +243,16 @@ export default function App() {
               type="button"
             >
               Clear chat
+            </button>
+          )}
+          {activeSession && (
+            <button
+              className="clear"
+              disabled={isStreaming}
+              onClick={() => void deleteSession()}
+              type="button"
+            >
+              Delete session
             </button>
           )}
         </header>

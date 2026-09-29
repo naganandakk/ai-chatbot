@@ -30,6 +30,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+# TypeScript build cache
+frontend/**/*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+
 
 # Editors and operating systems
 .vscode/

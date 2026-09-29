@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import remarkGfm from "remark-gfm";
 import { api, ChatSession, Message, SessionSummary } from "./api";
-import CopyContentBtn from './CopyContentBtn';
+import CopyContentBtn from './components/CopyContentBtn';
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -16,24 +16,17 @@ export default function App() {
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState("");
-
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitleText, setEditTitleText] = useState<string>('');
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const Pre = ({ children, ...props }: PreProps) => (
-    <div className="relative group my-4 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
-      <CopyContentBtn>{children}</CopyContentBtn>
-      <pre className="p-4 overflow-x-auto text-sm text-zinc-100">
-        {children}
-      </pre>
-    </div>
-  );
 
   async function refreshSessions() {
     try {
       setSessions(await api.listSessions());
+      if (sessions.length > 0) {
+        setActiveSession(await api.getSession(sessions[0].id));
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -48,8 +41,6 @@ export default function App() {
     void refreshSessions();
   }, []);
 
-  const activeChat = sessions.find(c => c.id === activeSession?.id) || sessions[0];
-
   async function createSession() {
     if (isStreaming) {
       return;
@@ -59,7 +50,7 @@ export default function App() {
       setError("");
       const session = await api.createSession();
       setActiveSession(session);
-      await refreshSessions();
+      setSessions([...sessions, session])
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -95,7 +86,7 @@ export default function App() {
       setError("");
       const session = await api.createSession();
       setActiveSession(session);
-      await refreshSessions();
+      setSessions([...sessions, session])
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -111,6 +102,7 @@ export default function App() {
 
     const userText = inputMessage.trim();
     setInputMessage('');
+    setIsGenerating(true);
 
     try {
       let session = activeSession;
@@ -152,10 +144,18 @@ export default function App() {
         });
       });
 
-      setActiveSession(await api.getSession(session.id));
-      await refreshSessions();
+      updatedSession = await api.getSession(session.id)
+      setActiveSession(updatedSession);
+      setSessions((currentSessions) => {
+        currentSessions.map((session) => {
+          if (session.id == updatedSession.id) {
+            return {...session, title:updatedSession.title}
+          }
+          return session
+        })
+      });
 
-      setIsGenerating(true);
+      setIsGenerating(false);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -177,7 +177,7 @@ export default function App() {
       setError("");
       await api.deleteSession(sessionId);
       setActiveSession(null);
-      await refreshSessions();
+      setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -198,7 +198,6 @@ export default function App() {
     try {
       setError("");
       setActiveSession(await api.clearChatHistory(sessionId));
-      await refreshSessions();
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -223,7 +222,14 @@ export default function App() {
     try {
       setError("");
       await api.renameSession(sessionId, editTitleText);
-      await refreshSessions();
+      setSessions(prevSessions =>
+        prevSessions.map(session => {
+          if (session.id === sessionId) {
+            return { ...session, title: editTitleText };
+          }
+          return session;
+        })
+      );
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -236,14 +242,14 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-white dark:bg-[#131314] text-[#202124] dark:text-[#e3e3e3]">
+    <div className="font-sans flex h-screen w-screen overflow-hidden bg-white dark:bg-[#131314] text-[#202124] dark:text-[#e3e3e3]">
       <aside className={`flex flex-col border-r border-[#dadce0] dark:border-[#3c4043] bg-[#f8f9fa] dark:bg-[#1e1f20] transition-all duration-300 z-20 ${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden md:w-20'}`}>
         <div className="flex items-center justify-between p-3 h-16 border-b border-[#dadce0]/50 dark:border-[#3c4043]/50">
           <div className={`flex items-center gap-3 overflow-hidden ${!sidebarOpen && 'md:hidden'}`}>
             <div className="flex items-center justify-center w-9 h-9 bg-white dark:bg-[#2d2e30] rounded-full shadow-sm border border-[#dadce0] dark:border-[#5f6368]">
               <Sparkles className="w-5 h-5 text-[#1a73e8] dark:text-[#8ab4f8]" />
             </div>
-            <span className="font-medium text-base tracking-tight text-[#202124] dark:text-[#e3e3e3] whitespace-nowrap">AI Chatbot</span>
+            <span className="font-extrabold text-base tracking-tight text-[#202124] dark:text-[#e3e3e3] whitespace-nowrap">AI Chatbot</span>
           </div>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-full hover:bg-[#e8eaed] dark:hover:bg-[#303134] text-[#5f6368] dark:text-[#9aa0a6]">
             <Menu className="w-5 h-5" />
@@ -251,22 +257,24 @@ export default function App() {
         </div>
 
         <div className="p-3">
-          <div onClick={handleNewChat} className={`flex items-center gap-3 w-full bg-[#c2e7ff] dark:bg-[#004a77] hover:bg-[#b3e0ff] text-[#001d35] dark:text-[#c2e7ff] font-medium py-3 px-4 rounded-full shadow-sm transition-all ${!sidebarOpen && 'md:justify-center md:px-2'}`}>
-            <SquarePen />
-            <span className={`truncate ${!sidebarOpen && 'md:hidden'}`}>New Chat</span>
+          <div onClick={handleNewChat} className={`text-sm flex items-center gap-2 w-full text-[#001d35] dark:text-[#c2e7ff] font-medium py-3 px-4 transition-all ${!sidebarOpen && 'md:justify-center md:px-2'}`}>
+            <SquarePen size="16"/>
+             {sidebarOpen && (<span>New Chat</span>)}
           </div>
         </div>
 
+
+        {sidebarOpen && (
         <div className="flex-1 overflow-y-auto px-2 space-y-1 py-1">
+        <span className={`text-sm flex items-center gap-2 w-full text-[#001d35] dark:text-[#c2e7ff] font-medium py-3 px-4 transition-all ${!sidebarOpen && 'md:justify-center md:px-2'}`}>Recents</span>
           {sessions.map(chat => {
             const isActive = chat.id === activeSession?.id;
             const isEditing = editingChatId === chat.id;
             const isMenuOpen = menuOpenId === chat.id;
 
             return (
-              <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); }} className={`group relative flex items-center justify-between px-3 py-2.5 rounded-full cursor-pointer text-sm transition-colors ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-medium' : 'hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
-                <div className="flex items-center gap-3 truncate flex-1 mr-2">
-                  <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-[#041e49] dark:text-[#c2e7ff]' : 'text-[#5f6368]'}`} />
+              <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); }} className={`group relative flex items-center justify-between px-3 py-1 rounded-full cursor-pointer text-sm transition-colors ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
+                <div className="flex items-center  truncate flex-1 mr-2">
                   {isEditing ? (
                     <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
                       <input type="text" value={editTitleText} onChange={e => setEditTitleText(e.target.value)} autoFocus className="bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-2 py-0.5 rounded text-xs w-full border border-[#1a73e8] focus:outline-none" />
@@ -274,7 +282,7 @@ export default function App() {
                       <button onClick={() => setEditingChatId(null)} className="p-1 text-red-600 rounded"><X className="w-3.5 h-3.5" /></button>
                     </div>
                   ) : (
-                    <span className={`truncate ${!sidebarOpen && 'md:hidden'}`}>{chat.title}</span>
+                    <span className={`text-xs truncate ${!sidebarOpen && 'md:hidden'}`}>{chat.title}</span>
                   )}
                 </div>
 
@@ -295,7 +303,7 @@ export default function App() {
               </div>
             );
           })}
-        </div>
+        </div>)}
       </aside>
 
       <main className="flex-1 flex flex-col h-full bg-white dark:bg-[#131314] relative overflow-hidden">
@@ -435,10 +443,6 @@ export default function App() {
                           </strong>
                         )
                       }}
-
-
-
-
                     >
                       {msg.content}
                     </ReactMarkdown>

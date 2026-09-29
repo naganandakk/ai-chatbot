@@ -9,25 +9,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        // Exact system UI stack match used inside Google's chat applications
-        sans: [
-          'system-ui',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          '"Segoe UI"',
-          'Roboto',
-          'Helvetica',
-          'Arial',
-          'sans-serif'
-        ],
-        mono: [
-          'SFMono-Regular',
-          'Consolas',
-          '"Liberation Mono"',
-          'Menlo',
-          'Courier',
-          'monospace'
-        ],
+        sans: ["'Google Sans Flex'", "'Google Sans'", "'Helvetica Neue'", 'sans-serif'],
       },
     },
   },

@@ -104,7 +104,7 @@ export const api = {
   listSessions: () =>
     request<SessionSummary[]>("/sessions"),
 
-  clearSession: (sessionId: string) =>
+  clearChatHistory: (sessionId: string) =>
     request<ChatSession>(`/sessions/${sessionId}/messages`, {
       method: "DELETE",
     }),
@@ -114,9 +114,13 @@ export const api = {
       method: "DELETE",
     }),
 
-  renameSession: (sessionId: string) =>
+  renameSession: (sessionId: string, title: string) =>
     request<ChatSession>(`/sessions/${sessionId}`, {
       method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title }),
     }),
 
   streamMessage,

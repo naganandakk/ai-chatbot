@@ -65,7 +65,7 @@ def create_app(
 
     @app.put("/api/sessions/<session_id>")
     def update_session(session_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = request.get_json(silent=False) or {}
         title = payload.get("title", "New Chat")
         try:
             session = session_store.update(session_id, title)
@@ -76,7 +76,7 @@ def create_app(
 
     @app.post("/api/sessions/<session_id>/messages")
     def send_message(session_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = request.get_json(silent=False) or {}
         prompt = payload.get("message", "")
 
         def generate():

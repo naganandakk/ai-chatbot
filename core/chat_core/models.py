@@ -12,11 +12,13 @@ class ChatMessage:
     role: str
     content: str
     created_at: str = field(default_factory=utc_now)
+    sources: str = ""
 
     def to_dict(self) -> dict[str, str]:
         return {
             "role": self.role,
             "content": self.content,
+            "sources": self.sources,
             "createdAt": self.created_at,
         }
 

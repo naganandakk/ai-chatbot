@@ -47,7 +47,7 @@ class DuckDBSessionStore:
 
         message_rows = self.connection.execute(
             """
-            SELECT role, content, created_at
+            SELECT role, content, sources, created_at
             FROM chat_messages
             WHERE session_id = ?
             ORDER BY created_at, id
@@ -56,8 +56,8 @@ class DuckDBSessionStore:
         ).fetchall()
 
         messages = [
-            ChatMessage(role=role, content=content, created_at=created_at)
-            for role, content, created_at in message_rows
+            ChatMessage(role=role, content=content, created_at=created_at, sources=sources)
+            for role, content, sources, created_at in message_rows
         ]
 
         return ChatSession(
@@ -88,9 +88,10 @@ class DuckDBSessionStore:
         session_id: str,
         role: str,
         content: str,
+        sources: str = ""
     ) -> ChatMessage:
         session = self._require(session_id)
-        message = ChatMessage(role=role, content=content)
+        message = ChatMessage(role=role, content=content, sources=sources)
         title = session.title
 
         if role == "user" and title == "New chat":
@@ -98,14 +99,15 @@ class DuckDBSessionStore:
 
         self.connection.execute(
             """
-            INSERT INTO chat_messages (id, session_id, role, content, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO chat_messages (id, session_id, role, content, sources, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             [
                 str(uuid4()),
                 session_id,
                 message.role,
                 message.content,
+                message.sources,
                 message.created_at,
             ],
         )
@@ -196,6 +198,7 @@ class DuckDBSessionStore:
                 session_id VARCHAR NOT NULL,
                 role VARCHAR NOT NULL,
                 content TEXT NOT NULL,
+                sources TEXT,
                 created_at VARCHAR NOT NULL
             )
             """

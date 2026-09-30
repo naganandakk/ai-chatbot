@@ -107,15 +107,10 @@ export default function App() {
         content: userText,
         createdAt: new Date().toISOString(),
       };
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: "",
-        createdAt: new Date().toISOString(),
-      };
 
       setActiveSession({
         ...session,
-        messages: [...session.messages, userMessage, assistantMessage],
+        messages: [...session.messages, userMessage],
       });
 
       await api.streamMessage(session.id, userText, (chunk) => {

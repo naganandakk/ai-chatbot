@@ -20,7 +20,7 @@ class SessionStore:
             reverse=True,
         )
 
-    def add_message(self, session_id: str, role: str, content: str) -> ChatMessage:
+    def add_message(self, session_id: str, role: str, content: str, sources: str = "") -> ChatMessage:
         session = self._require(session_id)
         message = ChatMessage(role=role, content=content)
         session.messages.append(message)

@@ -40,16 +40,23 @@ class ChatService:
             max_tokens=2048,
             messages=conversation,
             stream=True,
+            tools=[{"type": "web_search"}],
         )
 
         chunks: list[str] = []
+        sources: list[str] = []
 
         for event in response:
+            if event.type == "content_block_delta" and event.delta.type == "citations_delta":
+                sources.append(str({
+                    "title": event.delta.citation.title,
+                    "url": event.delta.citation.url
+                }))
             if event.type == "content_block_delta" and event.delta.type == "text_delta":
                 chunks.append(event.delta.text)
                 yield event.delta.text
 
-        self.store.add_message(session_id, "assistant", "".join(chunks))
+        self.store.add_message(session_id, "assistant", "".join(chunks), str(sources))
 
     def _client(self, settings: Settings) -> Anthropic:
         if self.client is not None:

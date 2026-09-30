@@ -81,25 +81,6 @@ export default function App() {
     }
   }
 
-  /*async function handleNewChat() {
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      setError("");
-      const session = await api.createSession();
-      setActiveSession(session);
-      setSessions([session, ...sessions])
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not create a session",
-      );
-    }
-  }*/
-
   async function handleSendMessage (e?: React.FormEvent) {
     e?.preventDefault();
     if (!inputMessage.trim() || isGenerating) return;
@@ -148,18 +129,14 @@ export default function App() {
         });
       });
 
-      updatedSession = await api.getSession(session.id)
+      const updatedSession = await api.getSession(session.id);
       setActiveSession(updatedSession);
-      setSessions((currentSessions) => {
-        currentSessions.map((session) => {
-          if (session.id == updatedSession.id) {
-            return {...session, title:updatedSession.title}
-          }
-          return session
-        })
-      });
-
-      setIsGenerating(false);
+      const isExistingSession = sessions.some(s => s.id == updatedSession.id);
+      if (!isExistingSession) {
+        setSessions([
+          {id: updatedSession.id, title: updatedSession.title}, ...sessions
+        ])
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error

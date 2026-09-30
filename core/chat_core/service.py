@@ -4,12 +4,13 @@ from anthropic import Anthropic
 
 from .settings import Settings
 from .store import SessionStore
+from .duckdb_store import DuckDBSessionStore
 
 
 class ChatService:
     def __init__(
         self,
-        store: SessionStore,
+        store: SessionStore | DuckDBSessionStore,
         client: Anthropic | None = None,
         settings: Settings | None = None,
     ) -> None:

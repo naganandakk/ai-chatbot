@@ -20,6 +20,13 @@ export default function App() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitleText, setEditTitleText] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [activeSession]);
 
   async function refreshSessions() {
     try {
@@ -40,7 +47,7 @@ export default function App() {
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
     void refreshSessions();
   }, []);
 

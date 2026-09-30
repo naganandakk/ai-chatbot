@@ -37,6 +37,9 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     void refreshSessions();
   }, []);
@@ -68,6 +71,7 @@ export default function App() {
     try {
       setError("");
       setActiveSession(await api.getSession(sessionId));
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -77,7 +81,7 @@ export default function App() {
     }
   }
 
-  async function handleNewChat() {
+  /*async function handleNewChat() {
     if (isGenerating) {
       return;
     }
@@ -86,7 +90,7 @@ export default function App() {
       setError("");
       const session = await api.createSession();
       setActiveSession(session);
-      setSessions([...sessions, session])
+      setSessions([session, ...sessions])
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -94,7 +98,7 @@ export default function App() {
           : "Could not create a session",
       );
     }
-  }
+  }*/
 
   async function handleSendMessage (e?: React.FormEvent) {
     e?.preventDefault();
@@ -243,7 +247,7 @@ export default function App() {
 
   return (
     <div className="font-sans flex h-screen w-screen overflow-hidden bg-white dark:bg-[#131314] text-[#202124] dark:text-[#e3e3e3]">
-      <aside className={`flex flex-col border-r border-[#dadce0] dark:border-[#3c4043] bg-[#f8f9fa] dark:bg-[#1e1f20] transition-all duration-300 z-20 ${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden md:w-20'}`}>
+      <aside className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col border-r border-[#dadce0] dark:border-[#3c4043] bg-[#f8f9fa] dark:bg-[#1e1f20] transition-all duration-300 ease-in-out z-50 ${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden md:w-0'}`}>
         <div className="flex items-center justify-between p-3 h-16 border-b border-[#dadce0]/50 dark:border-[#3c4043]/50">
           <div className={`flex items-center gap-3 overflow-hidden ${!sidebarOpen && 'md:hidden'}`}>
             <div className="flex items-center justify-center w-9 h-9 bg-white dark:bg-[#2d2e30] rounded-full shadow-sm border border-[#dadce0] dark:border-[#5f6368]">
@@ -256,66 +260,79 @@ export default function App() {
           </button>
         </div>
 
-        <div className="p-3">
-          <div onClick={handleNewChat} className={`text-sm flex items-center gap-2 w-full text-[#001d35] dark:text-[#c2e7ff] font-medium py-3 px-4 transition-all ${!sidebarOpen && 'md:justify-center md:px-2'}`}>
-            <SquarePen size="16"/>
-             {sidebarOpen && (<span>New Chat</span>)}
-          </div>
+    <div className="p-3">
+      {sidebarOpen && (
+        <div onClick={() => {
+          if (window.innerWidth < 768) setSidebarOpen(false);
+          setActiveSession(null);
+        }} className={`text-sm flex items-center gap-2 w-full rounded-full cursor-pointer font-medium py-1 px-3 transition-all ${!activeSession ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
+          <SquarePen size="16"/>
+          <span>New Chat</span>
         </div>
+        )}
+    </div>
 
+    {sidebarOpen && (
+    <div className="flex-1 overflow-y-auto px-2 space-y-1 py-1">
+      <span className="text-sm flex items-center gap-2 w-full text-[#001d35] dark:text-[#c2e7ff] font-bold py-1 px-3">Chats</span>
+      {sessions.map(chat => {
+        const isActive = chat.id === activeSession?.id;
+        const isEditing = editingChatId === chat.id;
+        const isMenuOpen = menuOpenId === chat.id;
 
-        {sidebarOpen && (
-        <div className="flex-1 overflow-y-auto px-2 space-y-1 py-1">
-        <span className={`text-sm flex items-center gap-2 w-full text-[#001d35] dark:text-[#c2e7ff] font-medium py-3 px-4 transition-all ${!sidebarOpen && 'md:justify-center md:px-2'}`}>Recents</span>
-          {sessions.map(chat => {
-            const isActive = chat.id === activeSession?.id;
-            const isEditing = editingChatId === chat.id;
-            const isMenuOpen = menuOpenId === chat.id;
-
-            return (
-              <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); }} className={`group relative flex items-center justify-between px-3 py-1 rounded-full cursor-pointer text-sm transition-colors ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
-                <div className="flex items-center  truncate flex-1 mr-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
-                      <input type="text" value={editTitleText} onChange={e => setEditTitleText(e.target.value)} autoFocus className="bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-2 py-0.5 rounded text-xs w-full border border-[#1a73e8] focus:outline-none" />
-                      <button onClick={() => renameSession(chat.id)} className="p-1 text-green-600 rounded"><Check className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => setEditingChatId(null)} className="p-1 text-red-600 rounded"><X className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ) : (
-                    <span className={`text-xs truncate ${!sidebarOpen && 'md:hidden'}`}>{chat.title}</span>
-                  )}
+        return (
+          <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); if (window.innerWidth < 768) setSidebarOpen(false);}} className={`group relative flex items-center justify-between px-3 py-1 rounded-full cursor-pointer text-sm transition-colors ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
+            <div className="flex items-center truncate flex-1 mr-2">
+              {isEditing ? (
+                <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
+                  <input type="text" value={editTitleText} onChange={e => setEditTitleText(e.target.value)} autoFocus className="bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-2 py-0.5 rounded text-xs w-full border border-[#1a73e8] focus:outline-none" />
+                  <button onClick={() => renameSession(chat.id)} className="p-1 text-green-600 rounded"><Check className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => setEditingChatId(null)} className="p-1 text-red-600 rounded"><X className="w-3.5 h-3.5" /></button>
                 </div>
+              ) : (
+                <span className="text-xs truncate">{chat.title}</span>
+              )}
+            </div>
 
-                {sidebarOpen && !isEditing && (
-                  <div className="relative">
-                    <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity">
-                      <MoreVertical className="w-4 h-4 text-[#5f6368]" />
-                    </button>
-                    {isMenuOpen && (
-                      <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#28292a] border border-[#dadce0] dark:border-[#3c4043] rounded-lg shadow-lg py-1 z-50">
-                        <button onClick={(e) => handleStartEdit(e, chat)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><Edit2 className="w-3.5 h-3.5" /> Rename</button>
-                        <button onClick={(e) => clearChatHistory(e, chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><RotateCcw className="w-3.5 h-3.5" /> Clear History</button>
-                        <button onClick={(e) => deleteSession(e, chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
-                      </div>
-                    )}
+            {!isEditing && (
+              <div className="relative">
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity">
+                  <MoreVertical className="w-4 h-4 text-[#5f6368]" />
+                </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#28292a] border border-[#dadce0] dark:border-[#3c4043] rounded-lg shadow-lg py-1 z-50">
+                    <button onClick={(e) => handleStartEdit(e, chat)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><Edit2 className="w-3.5 h-3.5" /> Rename</button>
+                    <button onClick={(e) => clearChatHistory(e, chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><RotateCcw className="w-3.5 h-3.5" /> Clear History</button>
+                    <button onClick={(e) => deleteSession(e, chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
                   </div>
                 )}
               </div>
-            );
-          })}
-        </div>)}
-      </aside>
-
-      <main className="flex-1 flex flex-col h-full bg-white dark:bg-[#131314] relative overflow-hidden">
-        <header className="flex items-center justify-between px-6 h-16 border-b border-[#dadce0]/40 dark:border-[#3c4043]/40 bg-white/80 dark:bg-[#131314]/80 backdrop-blur-md z-10">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-medium tracking-tight text-[#202124] dark:text-[#e3e3e3]">{activeSession?.title ?? "Start a conversation"}</h1>
+            )}
           </div>
+        );
+      })}
+    </div>)}
+  </aside>
+
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden w-full">
+        <header className="h-16 flex items-center gap-3 px-4 shrink-0">
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-full hover:bg-[#e8eaed] dark:hover:bg-[#303134] text-[#5f6368] dark:text-[#9aa0a6] transition-all"
+              aria-label="Open Sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+          <h2 className="md:hidden text-md font-bold text-[#202124] dark:text-[#e3e3e3] truncate">
+            AI Chatbot
+          </h2>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-4 md:px-0 py-6">
+       <div className="flex-1 overflow-y-auto p-4 w-full">
           <div className="max-w-3xl mx-auto w-full space-y-6">
-            {activeSession?.messages.length === 0 ? (
+            {!activeSession || activeSession?.messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[65vh] text-center px-4">
                 <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg mb-6 text-white">
                   <Sparkles className="w-8 h-8" />
@@ -340,36 +357,36 @@ export default function App() {
                       components={{
                         // Paragraph Sizing (Standard text blocks)
                         p: ({ children }) => (
-                          <p className="mt-0 mb-1.5 text-base leading-normal tracking-normal font-normal">
+                          <p className="mt-0 mb-0 text-base leading-normal tracking-normal font-normal">
                             {children}
                           </p>
                         ),
 
                         // Headings Scale
                         h1: ({ children }) => (
-                          <h1 className="text-2xl leading-tight tracking-tight font-semibold text-zinc-950 dark:text-white mt-2.5 mb-1">
+                          <h1 className="text-xl leading-tight tracking-tight font-semibold text-zinc-950 dark:text-white mt-2.5 mb-1">
                             {children}
                           </h1>
                         ),
                         h2: ({ children }) => (
-                          <h2 className="text-xl leading-snug tracking-tight font-semibold text-zinc-950 dark:text-white mt-2 mb-1">
+                          <h2 className="text-lg leading-snug tracking-tight font-semibold text-zinc-950 dark:text-white mt-2 mb-1">
                             {children}
                           </h2>
                         ),
                         h3: ({ children }) => (
-                          <h3 className="text-lg leading-snug tracking-normal font-semibold text-zinc-900 dark:text-zinc-200 mt-1.5 mb-0.5">
+                          <h3 className="text-md leading-snug tracking-normal font-semibold text-zinc-900 dark:text-zinc-200 mt-1.5 mb-0.5">
                             {children}
                           </h3>
                         ),
 
                         // Lists Layout Scale
                         ul: ({ children }) => (
-                          <ul className="list-disc pl-5 mt-0 mb-1.5 space-y-0 text-base leading-normal">
+                          <ul className="list-disc pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
                             {children}
                           </ul>
                         ),
                         ol: ({ children }) => (
-                          <ol className="list-decimal pl-5 mt-0 mb-1.5 space-y-0 text-base leading-normal">
+                          <ol className="list-decimal pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
                             {children}
                           </ol>
                         ),

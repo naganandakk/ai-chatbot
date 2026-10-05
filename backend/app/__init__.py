@@ -17,7 +17,7 @@ def create_app(
 
     session_store = store or SessionStore()
     app.config["SESSION_STORE"] = session_store
-    app.config["CHAT_SERVICE"] = chat_service or ChatService(session_store)
+    app.config["CHAT_SERVICE"] = chat_service or ChatService(store=session_store)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

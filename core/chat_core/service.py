@@ -13,10 +13,12 @@ class ChatService:
         store: SessionStore | DuckDBSessionStore,
         client: Anthropic | None = None,
         settings: Settings | None = None,
+        tools_enabled: list[str] | None = None,
     ) -> None:
         self.store = store
         self.client = client
         self.settings = settings
+        self.tools_enabled = tools_enabled if tools_enabled else []
 
     def stream_reply(self, session_id: str, prompt: str) -> Iterator[str]:
         message = prompt.strip()
@@ -35,13 +37,18 @@ class ChatService:
         ]
         settings = self._settings()
 
-        response = self._client(settings).messages.create(
-            model=settings.model,
-            max_tokens=2048,
-            messages=conversation,
-            stream=True,
-            tools=[{"type": "web_search"}],
-        )
+        params = {
+            "model": settings.model,
+            "max_tokens": 2048,
+            "messages": conversation,
+            "stream": True
+        }
+
+        tools = [{"type": tool} for tool in self.tools_enabled]
+        if len(tools) > 0:
+            params["tools"] = tools
+
+        response = self._client(settings).messages.create(**params,)
 
         chunks: list[str] = []
         sources: list[str] = []

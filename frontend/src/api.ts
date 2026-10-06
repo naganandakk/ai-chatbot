@@ -1,7 +1,13 @@
+export type Source = {
+  title: string,
+  url: string
+};
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  sources: Source[];
 };
 
 export type SessionSummary = {

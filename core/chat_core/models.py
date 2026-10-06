@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
+import json
 
 
 def utc_now() -> str:
@@ -14,11 +16,11 @@ class ChatMessage:
     created_at: str = field(default_factory=utc_now)
     sources: str = ""
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "content": self.content,
-            "sources": self.sources,
+            "sources": json.loads(self.sources.strip()) if self.sources.strip() else [],
             "createdAt": self.created_at,
         }
 

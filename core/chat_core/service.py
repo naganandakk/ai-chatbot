@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 
 from anthropic import Anthropic
@@ -51,19 +52,19 @@ class ChatService:
         response = self._client(settings).messages.create(**params,)
 
         chunks: list[str] = []
-        sources: list[str] = []
+        sources: list[dict] = []
 
         for event in response:
             if event.type == "content_block_delta" and event.delta.type == "citations_delta":
-                sources.append(str({
+                sources.append({
                     "title": event.delta.citation.title,
                     "url": event.delta.citation.url
-                }))
+                })
             if event.type == "content_block_delta" and event.delta.type == "text_delta":
                 chunks.append(event.delta.text)
                 yield event.delta.text
 
-        self.store.add_message(session_id, "assistant", "".join(chunks), str(sources))
+        self.store.add_message(session_id, "assistant", "".join(chunks), json.dumps(sources))
 
     def _client(self, settings: Settings) -> Anthropic:
         if self.client is not None:

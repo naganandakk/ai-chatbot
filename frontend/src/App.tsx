@@ -3,11 +3,12 @@ import ReactMarkdown from "react-markdown";
 import {
   MessageSquare, Plus, Send, Menu, Moon, Sun, SquarePen,
   MoreVertical, Edit2, Trash2, RotateCcw, Bot, User,
-  Sparkles, Code, Compass, HelpCircle, ArrowRight, Check, X
+  Sparkles, Code, Compass, HelpCircle, ArrowRight, Check, X, ChevronUp
 } from 'lucide-react';
 import remarkGfm from "remark-gfm";
 import { api, ChatSession, Message, SessionSummary } from "./api";
 import CopyContentBtn from './components/CopyContentBtn';
+import SourcesBtn from './components/SourcesBtn';
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -328,7 +329,8 @@ export default function App() {
               </div>
             ) : (
               activeSession?.messages.map((msg, idx) => (
-                <div key={idx} className={`flex items-start gap-4 justify-end`}>
+              <div key={idx}>
+                <div className={`flex items-start gap-4 justify-end`}>
                   <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'border border-[#dadce0]/60 dark:border-[#3c4043] rounded-tl-none'}`}>
                     <div className="whitespace-pre-wrap">
                     <ReactMarkdown
@@ -445,6 +447,12 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                <div className="mt-4">
+                  {msg.role === 'assistant' && msg.sources?.length > 0 && (
+                  <SourcesBtn sources={msg.sources} id={idx} />
+                  )}
+                </div>
+              </div>
               ))
             )}
 

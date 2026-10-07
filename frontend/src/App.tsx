@@ -21,6 +21,7 @@ export default function App() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitleText, setEditTitleText] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatActionsRef = useRef(null);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
@@ -51,6 +52,22 @@ export default function App() {
     scrollToBottom();
     void refreshSessions();
   }, []);
+
+   useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (chatActionsRef.current && !chatActionsRef.current.contains(event.target)) {
+        setMenuOpenId(null);
+      }
+    };
+
+    if (menuOpenId) {
+      document.addEventListener('mousedown', handleClickOutside, true);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+    };
+  }, [menuOpenId]);
 
   async function createSession() {
     if (isStreaming) {
@@ -275,7 +292,7 @@ export default function App() {
             </div>
 
             {!isEditing && (
-              <div className="relative">
+              <div className="relative" ref={chatActionsRef}>
                 <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity">
                   <MoreVertical className="w-4 h-4 text-[#5f6368]" />
                 </button>
@@ -331,7 +348,7 @@ export default function App() {
               activeSession?.messages.map((msg, idx) => (
               <div key={idx}>
                 <div className={`flex items-start gap-4 justify-end`}>
-                  <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'border border-[#dadce0]/60 dark:border-[#3c4043] rounded-tl-none'}`}>
+                  <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'rounded-tl-none'}`}>
                     <div className="whitespace-pre-wrap">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}

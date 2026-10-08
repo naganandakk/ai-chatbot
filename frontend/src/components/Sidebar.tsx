@@ -101,6 +101,13 @@ const Sidebar = () => {
 
     try {
       await api.renameSession(sessionId, editTitleText);
+      setSessions(prevSessions =>
+        prevSessions.map((session) =>
+          session.id === sessionId
+            ? { ...session, title: editTitleText }
+            : session
+        )
+      );
     } catch (requestError) {
       triggerError(
         requestError instanceof Error

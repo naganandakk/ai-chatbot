@@ -11,6 +11,7 @@ export const ContextProvider = ({ children }) => {
 	 const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
    const [editingChatId, setEditingChatId] = useState<string | null>(null);
    const [editTitleText, setEditTitleText] = useState<string>('');
+   const [inputMessage, setInputMessage] = useState<string>('');
 
 	return (
 		<Context.Provider value={{
@@ -21,7 +22,8 @@ export const ContextProvider = ({ children }) => {
       isGenerating, setIsGenerating,
       menuOpenId, setMenuOpenId,
       editingChatId, setEditingChatId,
-      editTitleText, setEditTitleText
+      editTitleText, setEditTitleText,
+      inputMessage, setInputMessage
     }}>
 			{children}
 		</Context.Provider>

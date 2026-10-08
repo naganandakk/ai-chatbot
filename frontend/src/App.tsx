@@ -10,6 +10,8 @@ import { api, ChatSession, Message, SessionSummary } from "./api";
 import CopyContentBtn from './components/CopyContentBtn';
 import SourcesBtn from './components/SourcesBtn';
 import Sidebar from './components/Sidebar';
+import MessageForm from './components/MessageForm';
+import Header from './components/Header';
 import { Context } from "./Context";
 
 export default function App() {
@@ -21,113 +23,15 @@ export default function App() {
     isGenerating, setIsGenerating,
     menuOpenId, setMenuOpenId,
     editingChatId, setEditingChatId,
-    editTitleText, setEditTitleText
+    editTitleText, setEditTitleText,
+    inputMessage, setInputMessage
   } = useContext(Context);
-  const [inputMessage, setInputMessage] = useState<string>('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  };
-
-  async function createSession() {
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      setError("");
-      const session = await api.createSession();
-      setActiveSession(session);
-      setSessions([...sessions, session])
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not create a session",
-      );
-    }
-  }
-
-  async function handleSendMessage (e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!inputMessage.trim() || isGenerating) return;
-
-    const userText = inputMessage.trim();
-    setInputMessage('');
-    setIsGenerating(true);
-
-    try {
-      let session = activeSession;
-      if (!session) {
-        session = await api.createSession();
-      }
-
-      const userMessage: Message = {
-        role: "user",
-        content: userText,
-        createdAt: new Date().toISOString(),
-      };
-
-      setActiveSession({
-        ...session,
-        messages: [...session.messages, userMessage],
-      });
-
-      await api.streamMessage(session.id, userText, (chunk) => {
-        setActiveSession((currentSession) => {
-          if (!currentSession || currentSession.id !== session.id) {
-            return currentSession;
-          }
-
-          const messages = [...currentSession.messages];
-          const lastMessage = messages[messages.length - 1];
-
-          messages[messages.length - 1] = {
-            ...lastMessage,
-            content: lastMessage.content + chunk,
-          };
-
-          return { ...currentSession, messages };
-        });
-      });
-
-      const updatedSession = await api.getSession(session.id);
-      setActiveSession(updatedSession);
-      const isExistingSession = sessions.some(s => s.id == updatedSession.id);
-      if (!isExistingSession) {
-        setSessions([
-          {id: updatedSession.id, title: updatedSession.title}, ...sessions
-        ])
-      }
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "The assistant could not respond",
-      );
-    } finally {
-      setIsGenerating(false);
-    }
-  }
 
   return (
     <div className="font-sans flex h-screen w-screen overflow-hidden bg-white dark:bg-[#131314] text-[#202124] dark:text-[#e3e3e3]">
       <Sidebar/>
       <main className="flex-1 flex flex-col h-full relative overflow-hidden w-full">
-        <header className="h-16 flex items-center gap-3 px-4 shrink-0">
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-full hover:bg-[#e8eaed] dark:hover:bg-[#303134] text-[#5f6368] dark:text-[#9aa0a6] transition-all"
-              aria-label="Open Sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          )}
-          <h2 className="md:hidden text-md font-bold text-[#202124] dark:text-[#e3e3e3] truncate">
-            AI Chatbot
-          </h2>
-        </header>
+        <Header/>
 
        <div className="flex-1 overflow-y-auto p-4 w-full">
           <div className="max-w-3xl mx-auto w-full space-y-6">
@@ -286,18 +190,12 @@ export default function App() {
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
         </div>
 
         <div className="p-4 bg-white dark:bg-[#131314]">
           <div className="max-w-3xl mx-auto w-full">
-            <form onSubmit={handleSendMessage} className="relative flex items-center bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border border-transparent focus-within:border-[#dadce0]">
-              <input type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder="Enter a prompt here..." className="w-full bg-transparent py-4 pl-6 pr-14 text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
-              <button type="submit" disabled={!inputMessage.trim() || isGenerating} className={`absolute right-3 p-2 rounded-full ${inputMessage.trim() && !isGenerating ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
+            <MessageForm/>
           </div>
         </div>
       </main>

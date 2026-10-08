@@ -79,8 +79,8 @@ class DuckDBSessionStore:
 
         return [
             session
-            for (session_id,) in rows
-            if (session := self.get(session_id)) is not None
+            for row in rows
+            if (session := self.get(row[0])) is not None
         ]
 
     def add_message(

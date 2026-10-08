@@ -1,4 +1,4 @@
-import { useRef, useEffect, useContext } from 'react';
+import React, { useRef, useEffect, useContext } from 'react';
 import {
   Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Check, X
 } from 'lucide-react';
@@ -37,6 +37,9 @@ const Sidebar = () => {
 
   async function openSession(sessionId: string) {
     if (isGenerating) {
+      return;
+    }
+    if (activeSession && activeSession.id === sessionId) {
       return;
     }
 
@@ -88,6 +91,24 @@ const Sidebar = () => {
       );
     } finally {
       setMenuOpenId(null);
+    }
+  }
+
+  async function renameSession(sessionId: string) {
+    if (isGenerating) {
+      return;
+    }
+
+    try {
+      await api.renameSession(sessionId, editTitleText);
+    } catch (requestError) {
+      triggerError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not clear the session",
+      );
+    } finally {
+      setEditingChatId(null);
     }
   }
 

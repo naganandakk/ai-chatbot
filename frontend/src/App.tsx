@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import ReactMarkdown from "react-markdown";
 import {
   MessageSquare, Plus, Send, Menu, Moon, Sun, SquarePen,
@@ -9,68 +9,28 @@ import remarkGfm from "remark-gfm";
 import { api, ChatSession, Message, SessionSummary } from "./api";
 import CopyContentBtn from './components/CopyContentBtn';
 import SourcesBtn from './components/SourcesBtn';
+import Sidebar from './components/Sidebar';
+import { Context } from "./Context";
 
 export default function App() {
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
+  const {
+    sidebarOpen, setSidebarOpen,
+    activeSession, setActiveSession,
+    sessions, setSessions,
+    error, setError,
+    isGenerating, setIsGenerating,
+    menuOpenId, setMenuOpenId,
+    editingChatId, setEditingChatId,
+    editTitleText, setEditTitleText
+  } = useContext(Context);
   const [inputMessage, setInputMessage] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [error, setError] = useState("");
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [editTitleText, setEditTitleText] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatActionsRef = useRef(null);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [activeSession]);
-
-  async function refreshSessions() {
-    try {
-      setSessions(await api.listSessions());
-      if (sessions.length > 0) {
-        setActiveSession(await api.getSession(sessions[0].id));
-      }
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not load sessions",
-      );
-    }
-  }
-
-  useEffect(() => {
-    if (window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
-    scrollToBottom();
-    void refreshSessions();
-  }, []);
-
-   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (chatActionsRef.current && !chatActionsRef.current.contains(event.target)) {
-        setMenuOpenId(null);
-      }
-    };
-
-    if (menuOpenId) {
-      document.addEventListener('mousedown', handleClickOutside, true);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside, true);
-    };
-  }, [menuOpenId]);
-
   async function createSession() {
-    if (isStreaming) {
+    if (isGenerating) {
       return;
     }
 
@@ -84,24 +44,6 @@ export default function App() {
         requestError instanceof Error
           ? requestError.message
           : "Could not create a session",
-      );
-    }
-  }
-
-  async function openSession(sessionId: string) {
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      setError("");
-      setActiveSession(await api.getSession(sessionId));
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not open the session",
       );
     }
   }
@@ -168,149 +110,9 @@ export default function App() {
     }
   }
 
-  async function deleteSession(e: React.MouseEvent, sessionId: string) {
-    e.stopPropagation();
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      setError("");
-      await api.deleteSession(sessionId);
-      setActiveSession(null);
-      setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not delete the session",
-      );
-    } finally {
-      setMenuOpenId(null);
-    }
-  }
-
-  async function clearChatHistory(e: React.MouseEvent, sessionId: string) {
-    e.stopPropagation();
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      setError("");
-      setActiveSession(await api.clearChatHistory(sessionId));
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not clear the session",
-      );
-    } finally {
-      setMenuOpenId(null);
-    }
-  }
-
-  const handleStartEdit = (e: React.MouseEvent, chat: ChatSession) => {
-    e.stopPropagation();
-    setEditingChatId(chat.id);
-    setEditTitleText(chat.title);
-    setMenuOpenId(null);
-  };
-
-  async function renameSession(sessionId: string) {
-    if (!editTitleText.trim()) return;
-
-    try {
-      setError("");
-      await api.renameSession(sessionId, editTitleText);
-      setSessions(prevSessions =>
-        prevSessions.map(session => {
-          if (session.id === sessionId) {
-            return { ...session, title: editTitleText };
-          }
-          return session;
-        })
-      );
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not rename the session",
-      );
-    } finally {
-      setEditingChatId(null);
-    }
-  }
-
   return (
     <div className="font-sans flex h-screen w-screen overflow-hidden bg-white dark:bg-[#131314] text-[#202124] dark:text-[#e3e3e3]">
-      <aside className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col border-r border-[#dadce0] dark:border-[#3c4043] bg-[#f8f9fa] dark:bg-[#1e1f20] transition-all duration-300 ease-in-out z-50 ${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden md:w-0'}`}>
-        <div className="flex items-center justify-between p-3 h-16 border-b border-[#dadce0]/50 dark:border-[#3c4043]/50">
-          <div className={`flex items-center gap-3 overflow-hidden ${!sidebarOpen && 'md:hidden'}`}>
-            <div className="flex items-center justify-center w-9 h-9 bg-white dark:bg-[#2d2e30] rounded-full shadow-sm border border-[#dadce0] dark:border-[#5f6368]">
-              <Sparkles className="w-5 h-5 text-[#1a73e8] dark:text-[#8ab4f8]" />
-            </div>
-            <span className="font-extrabold text-base tracking-tight text-[#202124] dark:text-[#e3e3e3] whitespace-nowrap">AI Chatbot</span>
-          </div>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-full hover:bg-[#e8eaed] dark:hover:bg-[#303134] text-[#5f6368] dark:text-[#9aa0a6]">
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
-
-    <div className="p-3">
-      {sidebarOpen && (
-        <div onClick={() => {
-          if (window.innerWidth < 768) setSidebarOpen(false);
-          setActiveSession(null);
-        }} className={`text-sm flex items-center gap-2 w-full rounded-full cursor-pointer font-medium py-1 px-3 transition-all ${!activeSession ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
-          <SquarePen size="16"/>
-          <span>New Chat</span>
-        </div>
-        )}
-    </div>
-
-    {sidebarOpen && (
-    <div className="flex-1 overflow-y-auto px-2 space-y-1 py-1">
-      <span className="text-sm flex items-center gap-2 w-full text-[#001d35] dark:text-[#c2e7ff] font-bold py-1 px-3">Chats</span>
-      {sessions.map(chat => {
-        const isActive = chat.id === activeSession?.id;
-        const isEditing = editingChatId === chat.id;
-        const isMenuOpen = menuOpenId === chat.id;
-
-        return (
-          <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); if (window.innerWidth < 768) setSidebarOpen(false);}} className={`group relative flex items-center justify-between px-3 py-1 rounded-full cursor-pointer text-sm transition-colors ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
-            <div className="flex items-center truncate flex-1 mr-2">
-              {isEditing ? (
-                <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
-                  <input type="text" value={editTitleText} onChange={e => setEditTitleText(e.target.value)} autoFocus className="bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-2 py-0.5 rounded text-xs w-full border border-[#1a73e8] focus:outline-none" />
-                  <button onClick={() => renameSession(chat.id)} className="p-1 text-green-600 rounded"><Check className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setEditingChatId(null)} className="p-1 text-red-600 rounded"><X className="w-3.5 h-3.5" /></button>
-                </div>
-              ) : (
-                <span className="text-xs truncate">{chat.title}</span>
-              )}
-            </div>
-
-            {!isEditing && (
-              <div className="relative" ref={chatActionsRef}>
-                <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity">
-                  <MoreVertical className="w-4 h-4 text-[#5f6368]" />
-                </button>
-                {isMenuOpen && (
-                  <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#28292a] border border-[#dadce0] dark:border-[#3c4043] rounded-lg shadow-lg py-1 z-50">
-                    <button onClick={(e) => handleStartEdit(e, chat)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><Edit2 className="w-3.5 h-3.5" /> Rename</button>
-                    <button onClick={(e) => clearChatHistory(e, chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><RotateCcw className="w-3.5 h-3.5" /> Clear History</button>
-                    <button onClick={(e) => deleteSession(e, chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>)}
-  </aside>
-
+      <Sidebar/>
       <main className="flex-1 flex flex-col h-full relative overflow-hidden w-full">
         <header className="h-16 flex items-center gap-3 px-4 shrink-0">
           {!sidebarOpen && (

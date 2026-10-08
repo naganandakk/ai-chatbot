@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, ChevronUp } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 const SourcesBtn = ({ sources, id }) => {
   const [showSources, setShowSources] = useState(false);

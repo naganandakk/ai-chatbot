@@ -1,8 +1,6 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import { useContext } from 'react';
 import {
-  MessageSquare, Plus, Send, Menu, Moon, Sun, SquarePen,
-  MoreVertical, Edit2, Trash2, RotateCcw, Bot, User,
-  Sparkles, Code, Compass, HelpCircle, ArrowRight, Check, X, ChevronUp
+  Bot, Sparkles, Code, Compass
 } from 'lucide-react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,7 +16,6 @@ const ChatContainer = () => {
     isGenerating,
     setInputMessage
   } = useContext(Context);
-
   const streamingIcon = (
     isGenerating && (
       <div className="flex items-start gap-4 justify-start">
@@ -48,171 +45,152 @@ const ChatContainer = () => {
       </div>
     </div>
   );
-
   const messageList = (
     <>
-    {activeSession?.messages.map((msg, idx) => (
-      <div key={idx}>
-        <div className={`flex items-start gap-4 justify-end`}>
-          <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'rounded-tl-none'}`}>
-            <div className="whitespace-pre-wrap">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  // Paragraph Sizing (Standard text blocks)
-                  p: ({ children }) => (
-                    <p className="mt-0 mb-0 text-base leading-normal tracking-normal font-normal">
-                      {children}
-                    </p>
-                  ),
-
-                  // Headings Scale
-                  h1: ({ children }) => (
-                    <h1 className="text-xl leading-tight tracking-tight font-semibold text-zinc-950 dark:text-white mt-2.5 mb-1">
-                      {children}
-                    </h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className="text-lg leading-snug tracking-tight font-semibold text-zinc-950 dark:text-white mt-2 mb-1">
-                      {children}
-                    </h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className="text-md leading-snug tracking-normal font-semibold text-zinc-900 dark:text-zinc-200 mt-1.5 mb-0.5">
-                      {children}
-                    </h3>
-                  ),
-
-                  // Lists Layout Scale
-                  ul: ({ children }) => (
-                    <ul className="list-disc pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="list-decimal pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
-                      {children}
-                    </ol>
-                  ),
-                  li: ({ children }) => (
-                    <li className="pl-0.5 [&>p]:inline [&>p]:mb-0 [&>p]:mt-0">{children}</li>
-                  ),
-
-                  // Tables Styling
-                  table: ({ children }) => (
-                    <div className="my-2 overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-800">
-                      <table className="w-full text-left text-sm border-collapse m-0">
+      {activeSession?.messages.map((msg, idx) => (
+        <div key={idx}>
+          <div className={`flex items-start gap-4 justify-end`}>
+            <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'rounded-tl-none'}`}>
+              <div className="whitespace-pre-wrap">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    // Paragraph Sizing (Standard text blocks)
+                    p: ({ children }) => (
+                      <p className="mt-0 mb-0 text-base leading-normal tracking-normal font-normal">
                         {children}
-                      </table>
-                    </div>
-                  ),
-                  thead: ({ children }) => (
-                    <thead className="bg-zinc-100 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
-                      {children}
-                    </thead>
-                  ),
-                  tbody: ({ children }) => (
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {children}
-                    </tbody>
-                  ),
-                  tr: ({ children }) => (
-                    <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
-                      {children}
-                    </tr>
-                  ),
-                  th: ({ children }) => (
-                    <th className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-200 [&>p]:inline [&>p]:m-0">
-                      {children}
-                    </th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="px-3 py-1.5 text-zinc-800 dark:text-zinc-300 [&>p]:inline [&>p]:m-0">
-                      {children}
-                    </td>
-                  ),
+                      </p>
+                    ),
 
-                  // Inline Code & Blocks Scale
-                  // Gemini renders monospaced components exactly 1px down from normal variant text
-                  code: ({ children, ...props }) => {
-                    const isBlock = props.className?.includes('language-');
-                    if (isBlock) return <code {...props}>{children}</code>;
-
-                    return (
-                      <code
-                        className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 px-1 py-0.5 rounded text-sm font-mono border border-zinc-200/50 dark:border-zinc-700/50 break-words"
-                        {...props}
-                      >
+                    // Headings Scale
+                    h1: ({ children }) => (
+                      <h1 className="text-xl leading-tight tracking-tight font-semibold text-zinc-950 dark:text-white mt-2.5 mb-1">
                         {children}
-                      </code>
-                    );
-                  },
-
-                  pre: ({ children, ...props }) => (
-                    <div className="relative group my-1.5 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
-                      <CopyContentBtn>{children}</CopyContentBtn>
-                      <pre className="p-2.5 overflow-x-auto text-sm leading-5 text-zinc-100 m-0" {...props}>
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-lg leading-snug tracking-tight font-semibold text-zinc-950 dark:text-white mt-2 mb-1">
                         {children}
-                      </pre>
-                    </div>
-                  ),
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-md leading-snug tracking-normal font-semibold text-zinc-900 dark:text-zinc-200 mt-1.5 mb-0.5">
+                        {children}
+                      </h3>
+                    ),
 
-                  // Bold Text Configuration
-                  strong: ({ children }) => (
-                    <strong className="font-semibold text-zinc-950 dark:text-white">
-                      {children}
-                    </strong>
-                  )
-                }}
-              >
-                {msg.content}
-              </ReactMarkdown>
+                    // Lists Layout Scale
+                    ul: ({ children }) => (
+                      <ul className="list-disc pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
+                        {children}
+                      </ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className="pl-0.5 [&>p]:inline [&>p]:mb-0 [&>p]:mt-0">{children}</li>
+                    ),
+
+                    // Tables Styling
+                    table: ({ children }) => (
+                      <div className="my-2 overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-800">
+                        <table className="w-full text-left text-sm border-collapse m-0">
+                          {children}
+                        </table>
+                      </div>
+                    ),
+                    thead: ({ children }) => (
+                      <thead className="bg-zinc-100 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
+                        {children}
+                      </thead>
+                    ),
+                    tbody: ({ children }) => (
+                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                        {children}
+                      </tbody>
+                    ),
+                    tr: ({ children }) => (
+                      <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                        {children}
+                      </tr>
+                    ),
+                    th: ({ children }) => (
+                      <th className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-200 [&>p]:inline [&>p]:m-0">
+                        {children}
+                      </th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="px-3 py-1.5 text-zinc-800 dark:text-zinc-300 [&>p]:inline [&>p]:m-0">
+                        {children}
+                      </td>
+                    ),
+
+                    // Inline Code & Blocks Scale
+                    // Gemini renders monospaced components exactly 1px down from normal variant text
+                    code: ({ children, ...props }) => {
+                      const isBlock = props.className?.includes('language-');
+                      if (isBlock) return <code {...props}>{children}</code>;
+
+                      return (
+                        <code
+                          className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 px-1 py-0.5 rounded text-sm font-mono border border-zinc-200/50 dark:border-zinc-700/50 break-words"
+                          {...props}
+                        >
+                          {children}
+                        </code>
+                      );
+                    },
+
+                    pre: ({ children, ...props }) => (
+                      <div className="relative group my-1.5 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
+                        <CopyContentBtn>{children}</CopyContentBtn>
+                        <pre className="p-2.5 overflow-x-auto text-sm leading-5 text-zinc-100 m-0" {...props}>
+                          {children}
+                        </pre>
+                      </div>
+                    ),
+
+                    // Bold Text Configuration
+                    strong: ({ children }) => (
+                      <strong className="font-semibold text-zinc-950 dark:text-white">
+                        {children}
+                      </strong>
+                    )
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
+          <div className="mt-4">
+            <SourcesBtn sources={msg.sources} id={idx} />
+          </div>
         </div>
-        <div className="mt-4">
-          {msg.role === 'assistant' && msg.sources?.length > 0 && (
-          <SourcesBtn sources={msg.sources} id={idx} />
-          )}
-        </div>
-      </div>
-    ))
-  }
+      ))
+    }
+    {streamingIcon}
   </>
   );
+  const chatContainerContent = !activeSession || activeSession?.messages.length === 0 ? newChat : messageList
 
-  if (!activeSession || activeSession?.messages.length === 0) {
-    return (
-      <>
-        <div className="flex-1 overflow-y-auto p-4 w-full">
-          <div className="max-w-3xl mx-auto w-full space-y-6">
-            {newChat}
-          </div>
+  return (
+    <>
+      <div className="flex-1 overflow-y-auto p-4 w-full">
+        <div className="max-w-3xl mx-auto w-full space-y-6">
+          {chatContainerContent}
         </div>
-        <div className="p-4 bg-white dark:bg-[#131314]">
-          <div className="max-w-3xl mx-auto w-full">
-            <PromptInput/>
-          </div>
+      </div>
+      <div className="p-4 bg-white dark:bg-[#131314]">
+        <div className="max-w-3xl mx-auto w-full">
+          <PromptInput/>
         </div>
-      </>
-    );
-  } else {
-    return (
-      <>
-        <div className="flex-1 overflow-y-auto p-4 w-full">
-          <div className="max-w-3xl mx-auto w-full space-y-6">
-            {messageList}
-            {streamingIcon}
-          </div>
-        </div>
-        <div className="p-4 bg-white dark:bg-[#131314]">
-          <div className="max-w-3xl mx-auto w-full">
-            <PromptInput/>
-          </div>
-        </div>
-      </>
-    );
-  }
+      </div>
+    </>
+  );
 }
 
 export default ChatContainer;

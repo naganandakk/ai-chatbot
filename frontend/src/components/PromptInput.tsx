@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import { useContext } from 'react';
 import {
-  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Check, X, Send
+  Send
 } from 'lucide-react';
 import { api } from "../api";
 import { Context } from "../Context";

@@ -5,13 +5,14 @@ import {
 import { api } from "../api";
 import { Context } from "../Context";
 
-const MessageForm = () => {
+const PromptInput = () => {
   const {
     activeSession, setActiveSession,
     sessions, setSessions,
     error, setError,
     isGenerating, setIsGenerating,
-    inputMessage, setInputMessage
+    inputMessage, setInputMessage,
+    triggerError
   } = useContext(Context);
 
   async function createSession() {
@@ -24,7 +25,7 @@ const MessageForm = () => {
       setActiveSession(session);
       setSessions([...sessions, session])
     } catch (requestError) {
-      setError(
+      triggerError(
         requestError instanceof Error
           ? requestError.message
           : "Could not create a session",
@@ -84,7 +85,7 @@ const MessageForm = () => {
         ])
       }
     } catch (requestError) {
-      setError(
+      triggerError(
         requestError instanceof Error
           ? requestError.message
           : "The assistant could not respond",
@@ -103,4 +104,4 @@ const MessageForm = () => {
     </form>
 )};
 
-export default MessageForm;
+export default PromptInput;

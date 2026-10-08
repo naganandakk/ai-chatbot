@@ -10,7 +10,7 @@ const Sidebar = () => {
     sidebarOpen, setSidebarOpen,
     activeSession, setActiveSession,
     sessions, setSessions,
-    error, setError,
+    triggerError,
     isGenerating, setIsGenerating,
     menuOpenId, setMenuOpenId,
     editingChatId, setEditingChatId,
@@ -27,7 +27,7 @@ const Sidebar = () => {
         setActiveSession(await api.getSession(sessionList[0].id));
       }
     } catch (requestError) {
-      setError(
+      triggerError(
         requestError instanceof Error
           ? requestError.message
           : "Could not load sessions",
@@ -43,7 +43,7 @@ const Sidebar = () => {
     try {
       setActiveSession(await api.getSession(sessionId));
     } catch (requestError) {
-      setError(
+      triggerError(
         requestError instanceof Error
           ? requestError.message
           : "Could not open the session",
@@ -62,7 +62,7 @@ const Sidebar = () => {
       setActiveSession(null);
       setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
     } catch (requestError) {
-      setError(
+      triggerError(
         requestError instanceof Error
           ? requestError.message
           : "Could not delete the session",
@@ -81,7 +81,7 @@ const Sidebar = () => {
     try {
       setActiveSession(await api.clearChatHistory(sessionId));
     } catch (requestError) {
-      setError(
+      triggerError(
         requestError instanceof Error
           ? requestError.message
           : "Could not clear the session",

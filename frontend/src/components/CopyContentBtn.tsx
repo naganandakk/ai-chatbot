@@ -5,7 +5,7 @@ interface CopyContentBtnProps {
   children: React.ReactNode;
 }
 
-export default function CopyContentBtn({ children }: CopyContentBtnProps) {
+const CopyContentBtn = ({ children }: CopyContentBtnProps) => {
   const [copied, setCopied] = useState<boolean>(false);
 
   const handleCopy = async () => {
@@ -35,3 +35,5 @@ export default function CopyContentBtn({ children }: CopyContentBtnProps) {
     </button>
   );
 }
+
+export default CopyContentBtn;

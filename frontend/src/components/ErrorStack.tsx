@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { Context } from "../Context";
 
-export const ErrorStack = () => {
+const ErrorStack = () => {
   const { errors, removeError } = useContext(Context);
 
   return (
@@ -35,3 +35,5 @@ export const ErrorStack = () => {
     </div>
   );
 };
+
+export default ErrorStack;

@@ -1,9 +1,9 @@
-import React, { useRef, useEffect, useContext } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Check, X
 } from 'lucide-react';
-import { api } from "../api";
-import { Context } from "../Context";
+import { api, ChatSession, SessionSummary } from "../api";
+import { useAppContext } from "../Context";
 
 const Sidebar = () => {
   const {
@@ -15,9 +15,9 @@ const Sidebar = () => {
     menuOpenId, setMenuOpenId,
     editingChatId, setEditingChatId,
     editTitleText, setEditTitleText
-  } = useContext(Context);
-  const chatActionsRef = useRef(null);
-  const sidebarRef = useRef(null);
+  } = useAppContext();
+  const chatActionsRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   async function refreshSessions () {
     try {
@@ -119,7 +119,7 @@ const Sidebar = () => {
     }
   }
 
-  function handleStartEdit (e: React.MouseEvent, chat: ChatSession) {
+  function handleStartEdit (e: React.MouseEvent, chat: SessionSummary) {
     e.stopPropagation();
     setEditingChatId(chat.id);
     setEditTitleText(chat.title);
@@ -135,8 +135,8 @@ const Sidebar = () => {
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (chatActionsRef.current && !chatActionsRef.current.contains(event.target)) {
+    const handleClickOutside = (event: PointerEvent) => {
+      if (chatActionsRef.current && !chatActionsRef.current.contains(event.target as Node)) {
         setMenuOpenId(null);
       }
     };
@@ -154,8 +154,8 @@ const Sidebar = () => {
     if (!sidebarOpen || window.innerWidth >= 768) {
       return;
     }
-    const handleClickOutside = (event) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+    const handleClickOutside = (event: PointerEvent) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         setSidebarOpen(false);
       }
     };

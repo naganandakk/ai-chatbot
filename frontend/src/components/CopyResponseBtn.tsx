@@ -1,7 +1,7 @@
 // CopyResponseBtn.tsx
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
-import { Context } from '../Context';
+import { useAppContext } from '../Context';
 
 const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'PRE', 'TR', 'UL', 'OL', 'TABLE']);
 
@@ -82,7 +82,7 @@ interface CopyResponseBtnProps {
 }
 
 const CopyResponseBtn = ({ targetId }: CopyResponseBtnProps) => {
-  const { triggerError } = useContext(Context);
+  const { triggerError } = useAppContext();
   const [copied, setCopied] = useState<boolean>(false);
 
   const handleCopy = async () => {

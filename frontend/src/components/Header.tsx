@@ -1,13 +1,12 @@
-import { useContext } from 'react';
 import {
   Menu
 } from 'lucide-react';
-import { Context } from "../Context";
+import { useAppContext } from "../Context";
 
 const Header = () => {
   const {
     sidebarOpen, setSidebarOpen
-  } = useContext(Context);
+  } = useAppContext();
 
   return (
     <header className="h-16 flex items-center gap-3 px-4 shrink-0">

@@ -1,8 +1,7 @@
-import { useContext } from 'react';
-import { Context } from "../Context";
+import { useAppContext } from "../Context";
 
 const ErrorStack = () => {
-  const { errors, removeError } = useContext(Context);
+  const { errors, removeError } = useAppContext();
 
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 w-full max-w-sm pointer-events-none">

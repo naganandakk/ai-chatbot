@@ -1,15 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
+import type { Source } from '../api';
 
-const SourcesBtn = ({ sources, id }) => {
+interface SourcesBtnProps {
+  sources: Source[];
+  id: number;
+}
+
+const SourcesBtn = ({ sources, id }: SourcesBtnProps) => {
   const [showSources, setShowSources] = useState(false);
   const [isAbove, setIsAbove] = useState(false);
-  const tooltipRef = useRef(null);
-  const buttonRef = useRef(null);
-  const containerRef = useRef(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+    const handleClickOutside = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowSources(false);
       }
     };
@@ -24,10 +30,13 @@ const SourcesBtn = ({ sources, id }) => {
   }, [showSources]);
 
   useEffect(() => {
-    if (showSources && tooltipRef.current && buttonRef.current) {
+    const button = buttonRef.current;
+    const tooltip = tooltipRef.current;
+
+    if (showSources && tooltip && button) {
       setTimeout(() => {
-        const buttonRect = buttonRef.current.getBoundingClientRect();
-        const tooltipRect = tooltipRef.current.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
 
         const spaceBelow = window.innerHeight - buttonRect.bottom;
         const spaceAbove = buttonRect.top;
@@ -43,12 +52,12 @@ const SourcesBtn = ({ sources, id }) => {
     }
   }, [showSources]);
 
-  const handleButtonClick = (e) => {
+  const handleButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowSources(prev => !prev);
   };
 
-  const handleCloseClick = (e) => {
+  const handleCloseClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowSources(false);
   };

@@ -1,19 +1,17 @@
-import { useContext } from 'react';
 import {
   Send
 } from 'lucide-react';
-import { api } from "../api";
-import { Context } from "../Context";
+import { api, ChatSession, Message } from "../api";
+import { useAppContext } from "../Context";
 
 const PromptInput = () => {
   const {
     activeSession, setActiveSession,
     sessions, setSessions,
-    error, setError,
     isGenerating, setIsGenerating,
     inputMessage, setInputMessage,
     triggerError
-  } = useContext(Context);
+  } = useAppContext();
 
   async function createSession() {
     if (isGenerating) {
@@ -42,15 +40,13 @@ const PromptInput = () => {
     setIsGenerating(true);
 
     try {
-      let session = activeSession;
-      if (!session) {
-        session = await api.createSession();
-      }
+      const session: ChatSession = activeSession ?? (await api.createSession());
 
       const userMessage: Message = {
         role: "user",
         content: userText,
         createdAt: new Date().toISOString(),
+        sources: [],
       };
 
       setActiveSession({
@@ -81,7 +77,12 @@ const PromptInput = () => {
       const isExistingSession = sessions.some(s => s.id == updatedSession.id);
       if (!isExistingSession) {
         setSessions([
-          {id: updatedSession.id, title: updatedSession.title}, ...sessions
+          {
+            id: updatedSession.id,
+            title: updatedSession.title,
+            createdAt: updatedSession.createdAt,
+            updatedAt: updatedSession.updatedAt,
+          }, ...sessions
         ])
       }
     } catch (requestError) {

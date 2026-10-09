@@ -12,6 +12,7 @@ uv run pytest                        # full test suite (17 tests, ~1s, no networ
 uv run pytest tests/test_service.py::test_stream_reply_saves_user_and_assistant_messages  # single test
 uv run ruff check .                  # lint (line-length 100, py311)
 uv run flask --app backend.app.wsgi:app run --debug --no-reload --port 5000   # API
+uv run gunicorn --workers 1 --timeout 120 --bind 127.0.0.1:5000 backend.app.wsgi:app   # production-style server
 uv run python -m cli.main            # terminal client
 ```
 
@@ -20,7 +21,7 @@ Frontend (from `frontend/`):
 ```bash
 npm install
 npm run dev                          # Vite dev server on :5173, proxies /api -> 127.0.0.1:5000
-npm run build                        # currently FAILS: tsc -b reports ~63 type errors (see Known state)
+npm run build                        # runs tsc -b then vite build; passes
 ```
 
 Always use `--no-reload` with Flask: DuckDB takes a write lock on the database file and the reloader's second process will fail to open it.
@@ -49,6 +50,8 @@ The project is three layers sharing one core: a Flask API (`backend/`), a termin
 
 ## Known state
 
-- `npm run build` fails on TypeScript errors in `Sidebar.tsx`, `SourcesBtn.tsx`, and `Context.tsx` (untyped props, `Context.createContext()` with no default value, `ChatContainer` reading `error`/`setError` which the provider does not expose). `npm run dev` still runs because Vite does not type-check.
-- `uv run ruff check .` reports 4 issues (import sorting in `core/chat_core/models.py` and `service.py`, `datetime.UTC` alias, and a blind `except Exception` in `cli/main.py`).
-- The README's "Production deployment" section requires a single Gunicorn worker. DuckDB does not support multiple writers from separate processes.
+- `npm run build` passes: `tsc -b` reports no type errors and the Vite bundle builds.
+- `uv run ruff check .` passes. The CLI catches `anthropic.APIError` for request failures, so other exceptions propagate instead of being printed.
+- `uv run pytest` passes (17 tests).
+- Production runs Gunicorn with `--workers 1 --timeout 120` (see README "Production deployment"). Workers must stay at 1: DuckDB takes a write lock, and each worker opens the file at import. The default `sync` worker serves one request at a time, so a streaming reply blocks other requests. Threads must stay at 1 too: `DuckDBSessionStore` shares one connection, which is not thread-safe. Adding threads requires per-thread `connection.cursor()` calls first.
+- The default Gunicorn timeout (30s) is too short for slow model replies, which is why the command sets `--timeout 120`.

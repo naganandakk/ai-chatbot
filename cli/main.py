@@ -1,3 +1,5 @@
+from anthropic import APIError
+
 from core.chat_core.service import ChatService
 from core.chat_core.store import SessionStore
 
@@ -41,7 +43,7 @@ def main() -> None:
             print()
         except RuntimeError as error:
             print(f"\nConfiguration error: {error}")
-        except Exception as error:
+        except APIError as error:
             print(f"\nRequest failed: {error}")
 
 

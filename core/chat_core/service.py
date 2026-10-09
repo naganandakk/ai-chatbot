@@ -3,9 +3,9 @@ from collections.abc import Iterator
 
 from anthropic import Anthropic
 
+from .duckdb_store import DuckDBSessionStore
 from .settings import Settings
 from .store import SessionStore
-from .duckdb_store import DuckDBSessionStore
 
 
 class ChatService:

@@ -129,14 +129,20 @@ npm run build
 
 Deploy `frontend/dist/` to a static host, CDN, or reverse proxy. Configure it to serve the frontend and route `/api` requests to the Flask service.
 
-Set `AI_PROVIDER`, the provider-specific API key, `CLAUDE_MODEL`, and `CHAT_DATABASE_PATH` through your hosting platform's secret manager. Do not upload a `.env` file to production. Store the DuckDB file on persistent storage; ephemeral filesystem storage will erase sessions when the deployment restarts.
+Set `AI_PROVIDER`, the provider-specific API key, `CLAUDE_MODEL`, `CHAT_DATABASE_PATH`, and optionally `TOOLS_ENABLED` through your hosting platform's secret manager. Do not upload a `.env` file to production. Store the DuckDB file on persistent storage; ephemeral filesystem storage will erase sessions when the deployment restarts.
 
 Run the Flask application with Gunicorn:
 
 ```bash
 uv sync --frozen
-uv run gunicorn --workers 1 --bind 0.0.0.0:5000 backend.app.wsgi:app
+uv run gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:5000 backend.app.wsgi:app
 ```
+
+Keep these settings in mind:
+
+- `--workers 1` is required. `backend.app.wsgi` opens the DuckDB file when it is imported, and DuckDB takes a write lock, so a second worker cannot open the same file.
+- The default worker class is `sync`, which serves one request at a time. A streaming reply holds the worker until it finishes, so other requests wait. Do not raise `--threads` yet: the store shares one DuckDB connection across requests, and that connection is not safe to use from multiple threads.
+- `--timeout 120` replaces Gunicorn's default of 30 seconds. A sync worker does not report progress while handling a request, so a slow model reply could otherwise get the worker killed. Set this to the longest reply you expect.
 
 DuckDB is appropriate for one backend process. Do not run multiple Gunicorn workers or multiple application instances against the same write-enabled DuckDB file. For horizontal scaling or higher write concurrency, migrate session storage to PostgreSQL.
 

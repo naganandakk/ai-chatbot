@@ -5,6 +5,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CopyContentBtn from './CopyContentBtn';
+import CopyResponseBtn from './CopyResponseBtn';
 import { Context } from "../Context";
 import SourcesBtn from "./SourcesBtn";
 import PromptInput from './PromptInput';
@@ -51,7 +52,7 @@ const ChatContainer = () => {
         <div key={idx}>
           <div className={`flex items-start gap-4 justify-end`}>
             <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'rounded-tl-none'}`}>
-              <div className="whitespace-pre-wrap">
+              <div className="whitespace-pre-wrap" id={`response-${idx}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -166,7 +167,10 @@ const ChatContainer = () => {
               </div>
             </div>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 flex items-center gap-2">
+            {msg.role === 'assistant' && !(isGenerating && idx === activeSession.messages.length - 1) && (
+              <CopyResponseBtn targetId={`response-${idx}`} />
+            )}
             <SourcesBtn sources={msg.sources} id={idx} />
           </div>
         </div>

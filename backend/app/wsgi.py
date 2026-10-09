@@ -8,7 +8,7 @@ from core.chat_core.service import ChatService
 
 from . import create_app
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 database_path = os.getenv("CHAT_DATABASE_PATH", "data/chat.duckdb")
 tools_enabled_str = os.getenv("TOOLS_ENABLED", "").strip()

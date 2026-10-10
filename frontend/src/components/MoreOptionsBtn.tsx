@@ -1,15 +1,12 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { EllipsisVertical, Pause, Play, Volume2 } from 'lucide-react';
+import { speechPlayback, useSpeechPlayback } from '../speech';
 
 interface MoreOptionsBtnProps {
   model: string;
   content: string;
+  playbackId: string;
 }
-
-type PlaybackState = 'idle' | 'playing' | 'paused';
-
-// Only one message is read aloud at a time, so starting another one stops the current one
-let stopActivePlayback: (() => void) | null = null;
 
 // Removes markdown symbols so the speech engine does not read them out
 const toSpeechText = (markdown: string) => markdown
@@ -38,11 +35,11 @@ const getVisibleBounds = (element: HTMLElement) => {
   return bounds;
 };
 
-const MoreOptionsBtn = ({ model, content }: MoreOptionsBtnProps) => {
+const MoreOptionsBtn = ({ model, content, playbackId }: MoreOptionsBtnProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isAbove, setIsAbove] = useState(false);
-  const [playback, setPlayback] = useState<PlaybackState>('idle');
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const playback = useSpeechPlayback();
+  const playbackStatus = playback.id === playbackId ? playback.status : 'idle';
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,56 +79,19 @@ const MoreOptionsBtn = ({ model, content }: MoreOptionsBtnProps) => {
 
   // Stops speech if this message is removed from the chat while it is playing
   useEffect(() => () => {
-    if (utteranceRef.current) {
-      utteranceRef.current = null;
-      window.speechSynthesis.cancel();
+    if (speechPlayback.isActive(playbackId)) {
+      speechPlayback.stop();
     }
-  }, []);
-
-  const stopPlayback = () => {
-    utteranceRef.current = null;
-    window.speechSynthesis.cancel();
-    setPlayback('idle');
-  };
-
-  // Some browsers stay paused after cancel(), which would leave the next message silent
-  const clearPausedSpeech = () => {
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-  };
+  }, [playbackId]);
 
   const handleListen = () => {
-    if (playback === 'playing') {
-      window.speechSynthesis.pause();
-      setPlayback('paused');
-      return;
+    if (playbackStatus === 'playing') {
+      speechPlayback.pause();
+    } else if (playbackStatus === 'paused') {
+      speechPlayback.resume();
+    } else {
+      speechPlayback.play(playbackId, toSpeechText(content));
     }
-
-    if (playback === 'paused') {
-      window.speechSynthesis.resume();
-      setPlayback('playing');
-      return;
-    }
-
-    // Stops whichever message is playing so only the clicked message is read
-    stopActivePlayback?.();
-    clearPausedSpeech();
-
-    const utterance = new SpeechSynthesisUtterance(toSpeechText(content));
-    const finish = () => {
-      if (utteranceRef.current === utterance) {
-        utteranceRef.current = null;
-        setPlayback('idle');
-      }
-    };
-    utterance.onend = finish;
-    utterance.onerror = finish;
-
-    utteranceRef.current = utterance;
-    stopActivePlayback = stopPlayback;
-    window.speechSynthesis.speak(utterance);
-    setPlayback('playing');
   };
 
   const handleButtonClick = (e: React.MouseEvent) => {
@@ -139,8 +99,8 @@ const MoreOptionsBtn = ({ model, content }: MoreOptionsBtnProps) => {
     setShowMenu(prev => !prev);
   };
 
-  const listenLabel = { idle: 'Listen', playing: 'Pause', paused: 'Resume' }[playback];
-  const ListenIcon = { idle: Volume2, playing: Pause, paused: Play }[playback];
+  const listenLabel = { idle: 'Listen', playing: 'Pause', paused: 'Resume' }[playbackStatus];
+  const ListenIcon = { idle: Volume2, playing: Pause, paused: Play }[playbackStatus];
 
   return (
     <div

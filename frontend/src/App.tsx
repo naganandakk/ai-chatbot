@@ -2,6 +2,7 @@ import ChatContainer from './components/ChatContainer';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ErrorStack from './components/ErrorStack';
+import PlaybackControl from './components/PlaybackControl';
 
 const App = () => {
   return (
@@ -9,6 +10,7 @@ const App = () => {
       <ErrorStack/>
       <Sidebar/>
       <main className="flex-1 flex flex-col h-full relative overflow-hidden w-full">
+        <PlaybackControl/>
         <Header/>
         <ChatContainer/>
       </main>

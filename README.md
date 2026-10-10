@@ -11,6 +11,47 @@ A responsive chat application built with Flask, the Anthropic Python SDK, React,
 - Share core chat logic between the Flask API and CLI
 - Persist web chat sessions in DuckDB
 
+## Web interface features
+
+Sessions and sidebar
+
+- Start a new chat from the **New Chat** button in the sidebar
+- Open any saved chat from the sidebar list; the most recent chat opens on load
+- Per-chat menu (three-dot icon on hover): **Rename**, **Clear History**, and **Delete**
+- Rename a chat inline with the check and cancel buttons
+- The sidebar collapses with the menu icon and opens automatically on wide screens; on narrow screens it opens as an overlay and closes when you click outside it or pick a chat
+- Chat titles come from the first message, truncated to 48 characters
+
+Composing and replies
+
+- Type a prompt in the input box and press Enter or the send button
+- Replies stream in as they are generated, with a loading indicator before the first text arrives
+- Send is disabled while a reply is in progress or when the prompt is empty
+- Empty chats show starter prompts; click one to fill the input box
+- Assistant replies render Markdown, including code blocks, tables, headings, and lists
+- Errors appear as toast notifications in the top-right corner and can be dismissed
+
+Per-message actions
+
+- **Copy message**: click a user message to reveal a copy button for that message
+- **Copy response**: copies an assistant reply as rich text, keeping formatting, and as plain text
+- **Code block copy**: each code block has its own copy button
+- **Sources**: shown under an assistant reply when the model cites web sources; click to see each title and link, which open in a new tab
+- **More options** (three-dot icon under an assistant reply):
+  - **Listen** reads the reply aloud with the browser's speech synthesis, then changes to **Pause** while it plays and **Resume** after pausing
+  - Starting another message's Listen stops the one already playing
+  - While audio plays, a pause/resume icon button appears at the top right of the chat area, whichever message is playing; it disappears when playback ends
+  - Switching to another chat, or starting a new chat, stops playback
+  - The footer shows the model that produced the reply, or `Unknown` for replies saved before model tracking was added
+  - The menu opens above the button when there is not enough room below it in the chat area
+
+Appearance
+
+- The interface renders in light mode. Dark-mode styles exist in the components, but nothing applies Tailwind's `dark` class yet, so they are inactive
+- The layout adapts to narrow and wide screens
+
+Listen depends on the browser having a speech synthesis voice. If none is available, playback has no sound.
+
 ## Project structure
 
 ```text

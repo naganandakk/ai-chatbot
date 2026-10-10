@@ -208,7 +208,11 @@ const ChatContainer = () => {
             )}
             <SourcesBtn sources={msg.sources} id={idx} />
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
-              <MoreOptionsBtn model={msg.model} content={msg.content} />
+              <MoreOptionsBtn
+                model={msg.model}
+                content={msg.content}
+                playbackId={`${activeSession?.id}:${msg.createdAt}`}
+              />
             )}
           </div>
         </div>

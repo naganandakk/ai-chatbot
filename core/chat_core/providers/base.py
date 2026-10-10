@@ -2,9 +2,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Protocol
 
-# Upper bound on tokens per reply, shared by every provider.
-MAX_TOKENS = 2048
-
 
 class ProviderError(Exception):
     """A provider request failed. Raised by every provider, whatever its SDK."""

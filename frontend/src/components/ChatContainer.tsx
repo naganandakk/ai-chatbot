@@ -248,17 +248,13 @@ const ChatContainer = () => {
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
               <CopyResponseBtn targetId={`response-${idx}`} />
             )}
-            {msg.truncated && (
-              <span className="text-xs text-[#b06000] dark:text-[#fdd663]">
-                Reply stopped at the length limit
-              </span>
-            )}
             <SourcesBtn sources={msg.sources} id={idx} />
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
               <MoreOptionsBtn
                 model={msg.model}
                 content={msg.content}
                 playbackId={`${activeSession?.id}:${msg.createdAt}`}
+                truncated={msg.truncated}
               />
             )}
           </div>

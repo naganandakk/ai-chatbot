@@ -6,6 +6,7 @@ interface MoreOptionsBtnProps {
   model: string;
   content: string;
   playbackId: string;
+  truncated?: boolean;
 }
 
 // Removes markdown symbols so the speech engine does not read them out
@@ -35,7 +36,7 @@ const getVisibleBounds = (element: HTMLElement) => {
   return bounds;
 };
 
-const MoreOptionsBtn = ({ model, content, playbackId }: MoreOptionsBtnProps) => {
+const MoreOptionsBtn = ({ model, content, playbackId, truncated }: MoreOptionsBtnProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isAbove, setIsAbove] = useState(false);
   const playback = useSpeechPlayback();
@@ -142,6 +143,9 @@ const MoreOptionsBtn = ({ model, content, playbackId }: MoreOptionsBtnProps) => 
           </ul>
           <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-200">
             Used <span className="font-medium text-gray-800 break-all">{model || 'Unknown'}</span> model
+            {truncated && (
+              <div className="mt-1 text-amber-700">Reply stopped at the length limit</div>
+            )}
           </div>
         </div>
       )}

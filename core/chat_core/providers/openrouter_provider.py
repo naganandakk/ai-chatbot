@@ -4,8 +4,8 @@ import httpx
 from openrouter import OpenRouter
 from openrouter.errors import OpenRouterError
 
+from ..settings import DEFAULT_MAX_TOKENS
 from .base import (
-    MAX_TOKENS,
     Citation,
     ProviderError,
     ProviderEvent,
@@ -18,9 +18,15 @@ from .openrouter_http import CitationHttpClient
 
 
 class OpenRouterProvider:
-    def __init__(self, api_key: str, transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        transport: httpx.BaseTransport | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+    ) -> None:
         self._http = CitationHttpClient(transport=transport)
         self._client = OpenRouter(api_key=api_key, client=self._http)
+        self._max_tokens = max_tokens
 
     def stream(
         self,
@@ -31,7 +37,7 @@ class OpenRouterProvider:
     ) -> Iterator[ProviderEvent]:
         params = {
             "model": model,
-            "max_completion_tokens": MAX_TOKENS,
+            "max_completion_tokens": self._max_tokens,
             "messages": messages,
             # Reasoning tokens count against max_completion_tokens, and on reasoning models
             # they can use the whole budget and leave no visible reply.

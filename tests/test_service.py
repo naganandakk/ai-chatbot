@@ -14,7 +14,7 @@ from core.chat_core.providers import (
     TruncatedReplyError,
 )
 from core.chat_core.service import ChatService
-from core.chat_core.settings import Settings
+from core.chat_core.settings import DEFAULT_MAX_TOKENS, Settings
 from core.chat_core.store import InMemorySessionStore
 
 
@@ -245,7 +245,7 @@ def test_openrouter_stream_reply_uses_openrouter_sdk_and_saves_messages():
     assert saved_session.messages[1].content == "Hello world"
     assert saved_session.messages[1].model == "anthropic/claude-haiku-4.5"
     assert requests[0]["stream"] is True
-    assert requests[0]["max_completion_tokens"] == 2048
+    assert requests[0]["max_completion_tokens"] == DEFAULT_MAX_TOKENS
     assert requests[0]["reasoning"] == {"effort": "none"}
     assert requests[0]["messages"] == [{"role": "user", "content": "Say hello"}]
     assert "plugins" not in requests[0]
@@ -480,3 +480,16 @@ def test_anthropic_reply_cut_off_after_text_is_saved_as_truncated():
     assistant = store.get(session.id).messages[1]
     assert chunks == ["Partial"]
     assert assistant.truncated is True
+
+
+def test_provider_sends_configured_max_tokens():
+    store = InMemorySessionStore()
+    session = store.create()
+    requests: list[dict] = []
+    transport = openrouter_transport([openrouter_chunk("Hi")], requests)
+    provider = OpenRouterProvider(api_key="openrouter-key", transport=transport, max_tokens=512)
+    service = ChatService(store, provider=provider, settings=openrouter_settings())
+
+    list(service.stream_reply(session.id, "Hello"))
+
+    assert requests[0]["max_completion_tokens"] == 512

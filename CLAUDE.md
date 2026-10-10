@@ -34,7 +34,7 @@ The project is three layers sharing one core: a Flask API (`backend/`), a termin
 
 **`ChatService.stream_reply`** (`core/chat_core/service.py`) is the core of the app:
 1. Saves the user message to the store *before* calling the model. If the model call then fails, the user message remains persisted with no assistant reply.
-2. Loads the full session history and sends it to the model with `stream=True`. Anthropic requests go through the Anthropic SDK with `max_tokens=2048`. OpenRouter requests go through the OpenRouter SDK (`openrouter` package) with `max_completion_tokens=2048`.
+2. Loads the full session history and sends it to the model with `stream=True`. Anthropic requests go through the Anthropic SDK with `max_tokens` set from `MAX_TOKENS` (default 8192). OpenRouter requests go through the OpenRouter SDK (`openrouter` package) with `max_completion_tokens` set from the same value.
 3. Yields text deltas to the caller. Any `citations_delta` events are collected as `{title, url}` sources, then the full assistant text and sources are saved as one message.
 4. If `tools_enabled` is set (from `TOOLS_ENABLED`, e.g. `web_search`), it is passed to the API as server tools; citations from those tools are what populate `sources`.
 

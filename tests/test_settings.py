@@ -44,3 +44,28 @@ def test_loads_database_path(monkeypatch):
     settings = Settings.from_env()
 
     assert settings.database_path == "tmp/test-chat.duckdb"
+
+def test_max_tokens_defaults_when_unset(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    monkeypatch.delenv("MAX_TOKENS", raising=False)
+
+    assert Settings.from_env().max_tokens == 8192
+
+
+def test_max_tokens_is_read_from_env(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    monkeypatch.setenv("MAX_TOKENS", "4096")
+
+    assert Settings.from_env().max_tokens == 4096
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-5"])
+def test_rejects_invalid_max_tokens(monkeypatch, value):
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    monkeypatch.setenv("MAX_TOKENS", value)
+
+    with pytest.raises(RuntimeError, match="MAX_TOKENS"):
+        Settings.from_env()

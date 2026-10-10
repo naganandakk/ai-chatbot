@@ -2,8 +2,8 @@ from collections.abc import Iterator
 
 from anthropic import Anthropic, APIError
 
+from ..settings import DEFAULT_MAX_TOKENS
 from .base import (
-    MAX_TOKENS,
     Citation,
     ProviderError,
     ProviderEvent,
@@ -14,8 +14,14 @@ from .base import (
 
 
 class AnthropicProvider:
-    def __init__(self, api_key: str, client: Anthropic | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        client: Anthropic | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+    ) -> None:
         self._client = client or Anthropic(api_key=api_key)
+        self._max_tokens = max_tokens
 
     def stream(
         self,
@@ -26,7 +32,7 @@ class AnthropicProvider:
     ) -> Iterator[ProviderEvent]:
         params = {
             "model": model,
-            "max_tokens": MAX_TOKENS,
+            "max_tokens": self._max_tokens,
             "messages": messages,
             "stream": True,
         }

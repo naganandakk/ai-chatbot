@@ -94,6 +94,13 @@ const MoreOptionsBtn = ({ model, content }: MoreOptionsBtnProps) => {
     setPlayback('idle');
   };
 
+  // Some browsers stay paused after cancel(), which would leave the next message silent
+  const clearPausedSpeech = () => {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+  };
+
   const handleListen = () => {
     if (playback === 'playing') {
       window.speechSynthesis.pause();
@@ -107,7 +114,9 @@ const MoreOptionsBtn = ({ model, content }: MoreOptionsBtnProps) => {
       return;
     }
 
+    // Stops whichever message is playing so only the clicked message is read
     stopActivePlayback?.();
+    clearPausedSpeech();
 
     const utterance = new SpeechSynthesisUtterance(toSpeechText(content));
     const finish = () => {

@@ -2,7 +2,7 @@ import {
   Send
 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { api, ChatSession, Message } from "../api";
+import { api, ChatSession, Message, SessionSummary, StreamError } from "../api";
 import { useAppContext } from "../Context";
 
 const PromptInput = () => {
@@ -30,6 +30,15 @@ const PromptInput = () => {
       inputRef.current?.focus();
     }
   }, [promptFocusRequest]);
+
+  // Keeps the sidebar entry in step with the server's title and updatedAt
+  function upsertSessionSummary(summary: SessionSummary) {
+    setSessions((current) =>
+      current.some((existing) => existing.id === summary.id)
+        ? current.map((existing) => (existing.id === summary.id ? summary : existing))
+        : [summary, ...current],
+    );
+  }
 
   async function createSession() {
     if (isGenerating) {
@@ -83,46 +92,62 @@ const PromptInput = () => {
         messages: [...session.messages, userMessage, assistantMessage],
       });
 
-      await api.streamMessage(session.id, userText, (chunk) => {
+      await api.streamMessage(
+        session.id,
+        userText,
+        (chunk) => {
+          setActiveSession((currentSession) => {
+            if (!currentSession || currentSession.id !== session.id) {
+              return currentSession;
+            }
+
+            const messages = [...currentSession.messages];
+            const lastMessage = messages[messages.length - 1];
+
+            messages[messages.length - 1] = {
+              ...lastMessage,
+              content: lastMessage.content + chunk,
+            };
+
+            return { ...currentSession, messages };
+          });
+        },
+        ({ message, session: summary }) => {
+          // The saved reply carries sources and the truncated flag, so it replaces the streamed placeholder
+          setActiveSession((currentSession) => {
+            if (!currentSession || currentSession.id !== session.id) {
+              return currentSession;
+            }
+
+            const messages = [...currentSession.messages];
+            messages[messages.length - 1] = message;
+
+            return { ...currentSession, ...summary, messages };
+          });
+          upsertSessionSummary(summary);
+        },
+      );
+    } catch (requestError) {
+      if (requestError instanceof StreamError && requestError.session) {
+        // The server kept the user's message without a reply, so show its copy of the session
+        const serverSession = requestError.session;
+        setActiveSession(serverSession);
+        upsertSessionSummary({
+          id: serverSession.id,
+          title: serverSession.title,
+          createdAt: serverSession.createdAt,
+          updatedAt: serverSession.updatedAt,
+        });
+      } else {
+        // Drop the empty assistant placeholder so no copy or sources buttons are left behind
         setActiveSession((currentSession) => {
-          if (!currentSession || currentSession.id !== session.id) {
+          const lastMessage = currentSession?.messages[currentSession.messages.length - 1];
+          if (!currentSession || lastMessage?.role !== "assistant" || lastMessage.content) {
             return currentSession;
           }
-
-          const messages = [...currentSession.messages];
-          const lastMessage = messages[messages.length - 1];
-
-          messages[messages.length - 1] = {
-            ...lastMessage,
-            content: lastMessage.content + chunk,
-          };
-
-          return { ...currentSession, messages };
+          return { ...currentSession, messages: currentSession.messages.slice(0, -1) };
         });
-      });
-
-      const updatedSession = await api.getSession(session.id);
-      setActiveSession(updatedSession);
-      const isExistingSession = sessions.some(s => s.id == updatedSession.id);
-      if (!isExistingSession) {
-        setSessions([
-          {
-            id: updatedSession.id,
-            title: updatedSession.title,
-            createdAt: updatedSession.createdAt,
-            updatedAt: updatedSession.updatedAt,
-          }, ...sessions
-        ])
       }
-    } catch (requestError) {
-      // Drop the empty assistant placeholder so no copy or sources buttons are left behind
-      setActiveSession((currentSession) => {
-        const lastMessage = currentSession?.messages[currentSession.messages.length - 1];
-        if (!currentSession || lastMessage?.role !== "assistant" || lastMessage.content) {
-          return currentSession;
-        }
-        return { ...currentSession, messages: currentSession.messages.slice(0, -1) };
-      });
       notifyError(
         requestError instanceof Error
           ? requestError.message

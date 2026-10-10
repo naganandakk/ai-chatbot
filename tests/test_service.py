@@ -10,6 +10,7 @@ from core.chat_core.providers import (
     Citation,
     OpenRouterProvider,
     ProviderStreamError,
+    ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
 )
@@ -82,6 +83,34 @@ def test_stream_reply_saves_user_and_assistant_messages():
     assert client.messages.requests[0]["messages"] == [
         {"role": "user", "content": "Say hello"}
     ]
+
+
+def drain(generator):
+    chunks = []
+    while True:
+        try:
+            chunks.append(next(generator))
+        except StopIteration as finished:
+            return chunks, finished.value
+
+
+def test_stream_reply_returns_saved_assistant_message_with_sources():
+    store = InMemorySessionStore()
+    session = store.create()
+    provider = FakeProvider([
+        TextDelta("Hi"),
+        Citation(title="Docs", url="https://example.com/docs"),
+        ReplyTruncated(),
+    ])
+    service = ChatService(store, provider=provider, settings=anthropic_settings())
+
+    chunks, reply = drain(service.stream_reply(session.id, "Hello"))
+
+    assert chunks == ["Hi"]
+    assert reply.role == "assistant"
+    assert reply.content == "Hi"
+    assert reply.truncated is True
+    assert reply.to_dict()["sources"] == [{"title": "Docs", "url": "https://example.com/docs"}]
 
 
 def test_stream_reply_uses_requested_model_and_records_it():

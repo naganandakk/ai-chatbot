@@ -41,10 +41,27 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+export type StreamDone = {
+  message: Message;
+  session: SessionSummary;
+};
+
+// Carries the server's copy of the session when the stream fails, so the UI can reconcile
+export class StreamError extends Error {
+  session: ChatSession | null;
+
+  constructor(message: string, session: ChatSession | null) {
+    super(message);
+    this.name = "StreamError";
+    this.session = session;
+  }
+}
+
 async function streamMessage(
   sessionId: string,
   message: string,
   onDelta: (text: string) => void,
+  onDone: (result: StreamDone) => void,
 ): Promise<void> {
   const response = await fetch(`/api/sessions/${sessionId}/messages`, {
     method: "POST",
@@ -82,16 +99,18 @@ async function streamMessage(
         continue;
       }
 
-      const payload = JSON.parse(data) as {
-        message?: string;
-        text?: string;
-      };
+      const payload = JSON.parse(data);
 
       if (event.startsWith("event: error")) {
-        throw new Error(payload.message ?? "The response failed");
+        throw new StreamError(
+          payload.message ?? "The response failed",
+          payload.session ?? null,
+        );
       }
 
-      if (payload.text) {
+      if (event.startsWith("event: done")) {
+        onDone(payload as StreamDone);
+      } else if (payload.text) {
         onDelta(payload.text);
       }
     }

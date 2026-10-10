@@ -74,6 +74,10 @@ def create_app(
 
         return jsonify(session.to_dict(include_messages=False))
 
+    def session_state(session_id: str) -> dict | None:
+        session = session_store.get(session_id)
+        return session.to_dict() if session else None
+
     @app.post("/api/sessions/<session_id>/messages")
     def send_message(session_id: str):
         payload = request.get_json(silent=False) or {}
@@ -82,20 +86,33 @@ def create_app(
 
         def generate():
             try:
-                for chunk in app.config["CHAT_SERVICE"].stream_reply(session_id, prompt, model):
+                chunks = app.config["CHAT_SERVICE"].stream_reply(session_id, prompt, model)
+                while True:
+                    try:
+                        chunk = next(chunks)
+                    except StopIteration as finished:
+                        reply = finished.value
+                        break
+
                     event = json.dumps({"text": chunk})
                     yield f"event: delta\ndata: {event}\n\n"
 
-                yield "event: done\ndata: {}\n\n"
+                session = session_store.get(session_id)
+                event = {
+                    "message": reply.to_dict(),
+                    "session": session.to_dict(include_messages=False),
+                }
+                yield f"event: done\ndata: {json.dumps(event)}\n\n"
             except (KeyError, ValueError, TruncatedReplyError) as error:
-                event = json.dumps({"message": str(error)})
-                yield f"event: error\ndata: {event}\n\n"
+                event = {"message": str(error), "session": session_state(session_id)}
+                yield f"event: error\ndata: {json.dumps(event)}\n\n"
             except Exception:
                 app.logger.exception("Chat stream failed")
-                yield (
-                    "event: error\n"
-                    'data: {"message": "The model could not respond. Please try again."}\n\n'
-                )
+                event = {
+                    "message": "The model could not respond. Please try again.",
+                    "session": session_state(session_id),
+                }
+                yield f"event: error\ndata: {json.dumps(event)}\n\n"
 
         return Response(
             stream_with_context(generate()),

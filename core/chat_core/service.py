@@ -1,7 +1,8 @@
 import json
 import threading
-from collections.abc import Iterator
+from collections.abc import Generator
 
+from .models import ChatMessage
 from .providers import Citation, ModelProvider, ReplyTruncated, TextDelta, create_provider
 from .settings import Settings
 from .store import SessionStore
@@ -21,7 +22,10 @@ class ChatService:
         self.tools_enabled = tools_enabled if tools_enabled else []
         self._resolve_lock = threading.Lock()
 
-    def stream_reply(self, session_id: str, prompt: str, model: str | None = None) -> Iterator[str]:
+    def stream_reply(
+        self, session_id: str, prompt: str, model: str | None = None
+    ) -> Generator[str, None, ChatMessage]:
+        # Yields text deltas and returns the saved assistant message once the reply ends.
         message = prompt.strip()
         if not message:
             raise ValueError("Message cannot be empty")
@@ -56,7 +60,7 @@ class ChatService:
             elif isinstance(event, ReplyTruncated):
                 truncated = True
 
-        self.store.add_message(
+        return self.store.add_message(
             session_id,
             "assistant",
             "".join(chunks),

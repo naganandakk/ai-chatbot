@@ -1,10 +1,12 @@
 import {
   Bot, Sparkles, Code, Compass
 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message } from "../api";
 import CopyContentBtn from './CopyContentBtn';
+import CopyMessageBtn from './CopyMessageBtn';
 import CopyResponseBtn from './CopyResponseBtn';
 import { useAppContext } from "../Context";
 import SourcesBtn from "./SourcesBtn";
@@ -16,6 +18,34 @@ const ChatContainer = () => {
     isGenerating,
     setInputMessage
   } = useAppContext();
+  // Index of the user message whose copy button is revealed by a click
+  const [copyableIdx, setCopyableIdx] = useState<number | null>(null);
+  const hideCopyable = useCallback(() => setCopyableIdx(null), []);
+
+  // Hides the copy button when the user clicks anywhere outside its message
+  useEffect(() => {
+    if (copyableIdx === null) {
+      return;
+    }
+
+    const hideOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest(`[data-user-message="${copyableIdx}"]`)) {
+        setCopyableIdx(null);
+      }
+    };
+
+    document.addEventListener('mousedown', hideOnOutsideClick);
+    return () => document.removeEventListener('mousedown', hideOnOutsideClick);
+  }, [copyableIdx]);
+
+  // Keeps text selection from toggling the copy button
+  const toggleCopyable = (idx: number) => {
+    if (window.getSelection()?.toString()) {
+      return;
+    }
+    setCopyableIdx(copyableIdx === idx ? null : idx);
+  };
   const streamingIcon = (
     isGenerating && (
       <div className="flex items-start gap-4 justify-start">
@@ -49,8 +79,13 @@ const ChatContainer = () => {
     <>
       {activeSession?.messages.map((msg: Message, idx: number) => (
         <div key={idx}>
-          <div className={`flex items-start gap-4 justify-end`}>
-            <div className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none' : 'rounded-tl-none'}`}>
+          <div className={`flex items-start gap-4 justify-end`} data-user-message={msg.role === 'user' ? idx : undefined}>
+            {msg.role === 'user' && copyableIdx === idx && (
+              <CopyMessageBtn text={msg.content} onHide={hideCopyable} />
+            )}
+            <div
+              onClick={msg.role === 'user' ? () => toggleCopyable(idx) : undefined}
+              className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none cursor-pointer' : 'rounded-tl-none'}`}>
               <div className="whitespace-pre-wrap" id={`response-${idx}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -166,7 +201,7 @@ const ChatContainer = () => {
               </div>
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2">
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
               <CopyResponseBtn targetId={`response-${idx}`} />
             )}

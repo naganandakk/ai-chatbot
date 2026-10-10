@@ -1,7 +1,7 @@
 import {
-  Bot, Sparkles, Code, Compass
+  ArrowDown, Bot, Sparkles, Code, Compass
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message } from "../api";
@@ -22,6 +22,28 @@ const ChatContainer = () => {
   // Index of the user message whose copy button is revealed by a click
   const [copyableIdx, setCopyableIdx] = useState<number | null>(null);
   const hideCopyable = useCallback(() => setCopyableIdx(null), []);
+
+  // Shows the scroll-to-bottom button only when the latest content is out of view
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const updateScrollToBottom = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) {
+      return;
+    }
+
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    setShowScrollToBottom(distanceFromBottom > 80);
+  }, []);
+
+  // Streamed text grows the list without firing a scroll event, so re-check on every update
+  useEffect(() => {
+    updateScrollToBottom();
+  }, [activeSession, updateScrollToBottom]);
+
+  const scrollToBottom = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  };
 
   // Hides the copy button when the user clicks anywhere outside its message
   useEffect(() => {
@@ -225,13 +247,24 @@ const ChatContainer = () => {
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto p-4 w-full">
+      <div ref={scrollRef} onScroll={updateScrollToBottom} className="flex-1 overflow-y-auto p-4 w-full">
         <div className="max-w-3xl mx-auto w-full space-y-6">
           {chatContainerContent}
         </div>
       </div>
       <div className="p-4 bg-white dark:bg-[#131314]">
-        <div className="max-w-3xl mx-auto w-full">
+        <div className="max-w-3xl mx-auto w-full relative">
+          {showScrollToBottom && (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              aria-label="Scroll to bottom"
+              title="Scroll to bottom"
+              className="absolute left-1/2 -translate-x-1/2 -top-14 z-10 p-2 rounded-full bg-white text-[#3c4043] shadow-md border border-[#dadce0] hover:bg-[#f1f3f4] transition-colors"
+            >
+              <ArrowDown className="w-5 h-5" />
+            </button>
+          )}
           <PromptInput/>
         </div>
       </div>

@@ -11,6 +11,7 @@ dependencies = [
   "gunicorn>=23.0.0",
   "python-dotenv>=1.0.1",
   "duckdb>=1.5.5",
+  "openrouter>=1.0.0",
 ]
 
 [dependency-groups]

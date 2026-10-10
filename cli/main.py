@@ -1,6 +1,7 @@
 from anthropic import APIError
+from openrouter.errors import OpenRouterError
 
-from core.chat_core.service import ChatService
+from core.chat_core.service import ChatService, ProviderStreamError
 from core.chat_core.store import SessionStore
 
 
@@ -43,7 +44,7 @@ def main() -> None:
             print()
         except RuntimeError as error:
             print(f"\nConfiguration error: {error}")
-        except APIError as error:
+        except (APIError, OpenRouterError, ProviderStreamError) as error:
             print(f"\nRequest failed: {error}")
 
 

@@ -1,6 +1,6 @@
 # AI Chat
 
-A responsive chat application built with Flask, the Anthropic Python SDK, React, and TypeScript. It supports direct Anthropic access and OpenRouter through the same Anthropic SDK integration.
+A responsive chat application built with Flask, the Anthropic Python SDK, React, and TypeScript. It supports direct Anthropic access through the Anthropic SDK and OpenRouter through the OpenRouter SDK.
 
 ## Features
 
@@ -26,6 +26,7 @@ Composing and replies
 
 - Type a prompt in the input box and press Enter or the send button
 - Replies stream in as they are generated, with a loading indicator before the first text arrives
+- When the chat is scrolled away from the latest message, a down-arrow button appears above the prompt box; click it to jump to the bottom
 - Send is disabled while a reply is in progress or when the prompt is empty
 - Empty chats show starter prompts; click one to fill the input box
 - Assistant replies render Markdown, including code blocks, tables, headings, and lists
@@ -99,7 +100,7 @@ CLAUDE_MODEL=claude-sonnet-4-5
 CHAT_DATABASE_PATH=data/chat.duckdb
 ```
 
-For OpenRouter access through the Anthropic SDK:
+For OpenRouter access through the OpenRouter SDK:
 
 ```env
 AI_PROVIDER=openrouter

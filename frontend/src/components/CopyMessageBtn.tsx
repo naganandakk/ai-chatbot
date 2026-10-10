@@ -12,7 +12,7 @@ interface CopyMessageBtnProps {
 }
 
 const CopyMessageBtn = ({ text, onHide }: CopyMessageBtnProps) => {
-  const { triggerError } = useAppContext();
+  const { notifyError } = useAppContext();
   const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ const CopyMessageBtn = ({ text, onHide }: CopyMessageBtnProps) => {
       setCopied(true);
     } catch (err) {
       console.error('Failed to copy message: ', err);
-      triggerError('Could not copy the message.');
+      notifyError('Could not copy the message.');
     }
   };
 

@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { ChatSession, SessionSummary } from "./api";
 
-interface AppErrorItem {
+type NotificationVariant = "error" | "success";
+
+interface AppNotification {
   id: string;
   message: string;
+  variant: NotificationVariant;
 }
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
@@ -25,9 +28,10 @@ interface AppContextValue {
   setEditTitleText: Setter<string>;
   inputMessage: string;
   setInputMessage: Setter<string>;
-  errors: AppErrorItem[];
-  triggerError: (message: string) => void;
-  removeError: (id: string) => void;
+  notifications: AppNotification[];
+  notifyError: (message: string) => void;
+  notifySuccess: (message: string) => void;
+  dismissNotification: (id: string) => void;
 }
 
 export const Context = createContext<AppContextValue | null>(null);
@@ -42,7 +46,7 @@ export const useAppContext = (): AppContextValue => {
   return value;
 };
 
-let errorCounter = 0;
+let notificationCounter = 0;
 
 export const ContextProvider = ({ children }: { children: React.ReactNode }) => {
   // Open by default on desktop only, so the sidebar overlay doesn't cover the chat on phones
@@ -54,23 +58,26 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitleText, setEditTitleText] = useState<string>('');
   const [inputMessage, setInputMessage] = useState<string>('');
-  const [errors, setErrors] = useState<AppErrorItem[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  const removeError = useCallback((id: string) => {
-    setErrors((prev) => prev.filter((err) => err.id !== id));
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((notification) => notification.id !== id));
   }, []);
 
-  const triggerError = useCallback((message: string) => {
+  const pushNotification = useCallback((message: string, variant: NotificationVariant) => {
     // crypto.randomUUID is unavailable on plain-HTTP origins, so use a counter-based ID instead
-    const id = `${Date.now()}-${++errorCounter}`;
+    const id = `${Date.now()}-${++notificationCounter}`;
 
-    setErrors((prev) => [...prev, { id, message }]);
+    setNotifications((prev) => [...prev, { id, message, variant }]);
 
-    // Each specific error sets its own timer to clean itself up after 5 seconds
+    // Each notification sets its own timer to clean itself up after 5 seconds
     setTimeout(() => {
-      removeError(id);
+      dismissNotification(id);
     }, 5000);
-  }, [removeError]);
+  }, [dismissNotification]);
+
+  const notifyError = useCallback((message: string) => pushNotification(message, "error"), [pushNotification]);
+  const notifySuccess = useCallback((message: string) => pushNotification(message, "success"), [pushNotification]);
 
   return (
     <Context.Provider value={{
@@ -82,7 +89,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       editingChatId, setEditingChatId,
       editTitleText, setEditTitleText,
       inputMessage, setInputMessage,
-      errors, triggerError, removeError
+      notifications, notifyError, notifySuccess, dismissNotification
     }}>
       {children}
     </Context.Provider>

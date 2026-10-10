@@ -83,7 +83,7 @@ interface CopyResponseBtnProps {
 }
 
 const CopyResponseBtn = ({ targetId }: CopyResponseBtnProps) => {
-  const { triggerError } = useAppContext();
+  const { notifyError } = useAppContext();
   const [copied, setCopied] = useState<boolean>(false);
 
   const handleCopy = async () => {
@@ -111,7 +111,7 @@ const CopyResponseBtn = ({ targetId }: CopyResponseBtnProps) => {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy response: ', err);
-      triggerError('Could not copy the response.');
+      notifyError('Could not copy the response.');
     }
   };
 

@@ -10,7 +10,7 @@ const PromptInput = () => {
     sessions, setSessions,
     isGenerating, setIsGenerating,
     inputMessage, setInputMessage,
-    triggerError
+    notifyError
   } = useAppContext();
 
   async function createSession() {
@@ -23,7 +23,7 @@ const PromptInput = () => {
       setActiveSession(session);
       setSessions([...sessions, session])
     } catch (requestError) {
-      triggerError(
+      notifyError(
         requestError instanceof Error
           ? requestError.message
           : "Could not create a session",
@@ -104,7 +104,7 @@ const PromptInput = () => {
         }
         return { ...currentSession, messages: currentSession.messages.slice(0, -1) };
       });
-      triggerError(
+      notifyError(
         requestError instanceof Error
           ? requestError.message
           : "The assistant could not respond",

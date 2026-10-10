@@ -1,6 +1,7 @@
 import {
   Send
 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { api, ChatSession, Message } from "../api";
 import { useAppContext } from "../Context";
 
@@ -8,10 +9,27 @@ const PromptInput = () => {
   const {
     activeSession, setActiveSession,
     sessions, setSessions,
+    isLoadingSession,
     isGenerating, setIsGenerating,
     inputMessage, setInputMessage,
+    promptFocusRequest,
     notifyError
   } = useAppContext();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the prompt when no chat is open. Desktop only, so phones don't pop the keyboard on load
+  useEffect(() => {
+    if (!activeSession && window.matchMedia('(min-width: 768px)').matches) {
+      inputRef.current?.focus();
+    }
+  }, [activeSession]);
+
+  // New Chat is a deliberate tap, so focus the prompt on every device
+  useEffect(() => {
+    if (promptFocusRequest > 0) {
+      inputRef.current?.focus();
+    }
+  }, [promptFocusRequest]);
 
   async function createSession() {
     if (isGenerating) {
@@ -33,7 +51,8 @@ const PromptInput = () => {
 
   async function handleSendMessage (e?: React.FormEvent) {
     e?.preventDefault();
-    if (!inputMessage.trim() || isGenerating) return;
+    // Sending while a session loads could attach the message to the wrong chat
+    if (!inputMessage.trim() || isGenerating || isLoadingSession) return;
 
     const userText = inputMessage.trim();
     setInputMessage('');
@@ -116,8 +135,8 @@ const PromptInput = () => {
 
   return (
     <form onSubmit={handleSendMessage} className="relative flex items-center bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border border-transparent focus-within:border-[#dadce0]">
-      <input type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder="Enter a prompt here..." className="w-full bg-transparent py-4 pl-6 pr-14 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
-      <button type="submit" disabled={!inputMessage.trim() || isGenerating} className={`absolute right-3 p-2 rounded-full ${inputMessage.trim() && !isGenerating ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
+      <input ref={inputRef} type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder={isLoadingSession ? "Loading chat..." : "Enter a prompt here..."} className="w-full bg-transparent py-4 pl-6 pr-14 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
+      <button type="submit" disabled={!inputMessage.trim() || isGenerating || isLoadingSession} className={`absolute right-3 p-2 rounded-full ${inputMessage.trim() && !isGenerating && !isLoadingSession ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
         <Send className="w-4 h-4" />
       </button>
     </form>

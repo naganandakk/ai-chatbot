@@ -1,5 +1,5 @@
 from backend.app import create_app
-from core.chat_core.store import SessionStore
+from core.chat_core.store import InMemorySessionStore, SessionStore
 
 
 class FakeChatService:
@@ -14,7 +14,7 @@ class FakeChatService:
 
 
 def test_streaming_message_endpoint():
-    store = SessionStore()
+    store = InMemorySessionStore()
     app = create_app(
         store=store,
         chat_service=FakeChatService(store),
@@ -58,3 +58,23 @@ def test_streaming_endpoint_reports_empty_message_error():
     assert response.content_type.startswith("text/event-stream")
     assert "event: error" in body
     assert '"message": "Message cannot be empty"' in body
+
+def test_streaming_endpoint_passes_truncated_reply_message_to_client():
+    from core.chat_core.providers import TruncatedReplyError
+
+    class TruncatingChatService:
+        def stream_reply(self, session_id: str, prompt: str, model: str | None = None):
+            raise TruncatedReplyError()
+            yield
+
+    app = create_app(chat_service=TruncatingChatService())
+    client = app.test_client()
+    session = client.post("/api/sessions").get_json()
+
+    body = client.post(
+        f"/api/sessions/{session['id']}/messages",
+        json={"message": "Explain everything"},
+    ).get_data(as_text=True)
+
+    assert "event: error" in body
+    assert "The model used its token limit before writing a reply" in body

@@ -6,6 +6,7 @@ from uuid import uuid4
 import duckdb
 
 from .models import ChatMessage, ChatSession, utc_now
+from .store import SessionStore
 
 
 def _serialized(method):
@@ -19,7 +20,7 @@ def _serialized(method):
     return wrapper
 
 
-class DuckDBSessionStore:
+class DuckDBSessionStore(SessionStore):
     def __init__(self, database_path: str) -> None:
         if database_path != ":memory:":
             Path(database_path).parent.mkdir(parents=True, exist_ok=True)
@@ -63,7 +64,7 @@ class DuckDBSessionStore:
 
         message_rows = self.connection.execute(
             """
-            SELECT role, content, sources, model, created_at
+            SELECT role, content, sources, model, truncated, created_at
             FROM chat_messages
             WHERE session_id = ?
             ORDER BY created_at, id
@@ -78,8 +79,9 @@ class DuckDBSessionStore:
                 created_at=created_at,
                 sources=sources or "",
                 model=model or "",
+                truncated=bool(truncated),
             )
-            for role, content, sources, model, created_at in message_rows
+            for role, content, sources, model, truncated, created_at in message_rows
         ]
 
         return ChatSession(
@@ -97,7 +99,7 @@ class DuckDBSessionStore:
             """
             SELECT id, title, created_at, updated_at
             FROM chat_sessions
-            ORDER BY updated_at DESC
+            ORDER BY created_at DESC
             """
         ).fetchall()
 
@@ -119,9 +121,16 @@ class DuckDBSessionStore:
         content: str,
         sources: str = "",
         model: str = "",
+        truncated: bool = False,
     ) -> ChatMessage:
         session = self._require(session_id)
-        message = ChatMessage(role=role, content=content, sources=sources, model=model)
+        message = ChatMessage(
+            role=role,
+            content=content,
+            sources=sources,
+            model=model,
+            truncated=truncated,
+        )
         title = session.title
 
         if role == "user" and title == "New chat":
@@ -129,8 +138,9 @@ class DuckDBSessionStore:
 
         self.connection.execute(
             """
-            INSERT INTO chat_messages (id, session_id, role, content, sources, model, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO chat_messages
+                (id, session_id, role, content, sources, model, truncated, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 str(uuid4()),
@@ -139,6 +149,7 @@ class DuckDBSessionStore:
                 message.content,
                 message.sources,
                 message.model,
+                message.truncated,
                 message.created_at,
             ],
         )
@@ -211,6 +222,7 @@ class DuckDBSessionStore:
 
         return renamed_session
 
+    @_serialized
     def close(self) -> None:
         self.connection.close()
 
@@ -238,9 +250,12 @@ class DuckDBSessionStore:
             )
             """
         )
-        # Databases created before the model column existed need it added in place.
+        # Databases created before these columns existed need them added in place.
         self.connection.execute(
             "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS model VARCHAR DEFAULT ''"
+        )
+        self.connection.execute(
+            "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS truncated BOOLEAN DEFAULT FALSE"
         )
         self.connection.execute(
             """
@@ -249,15 +264,3 @@ class DuckDBSessionStore:
             """
         )
 
-    def _require(self, session_id: str) -> ChatSession:
-        session = self.get(session_id)
-
-        if session is None:
-            raise KeyError(f"Session not found: {session_id}")
-
-        return session
-
-    @staticmethod
-    def _title_for(content: str) -> str:
-        normalized = content.strip().replace("\n", " ")
-        return normalized[:48] or "New chat"

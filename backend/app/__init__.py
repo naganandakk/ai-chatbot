@@ -3,19 +3,19 @@ import json
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
-from core.chat_core.duckdb_store import DuckDBSessionStore
+from core.chat_core.providers import TruncatedReplyError
 from core.chat_core.service import ChatService
-from core.chat_core.store import SessionStore
+from core.chat_core.store import InMemorySessionStore, SessionStore
 
 
 def create_app(
-    store: SessionStore | DuckDBSessionStore | None = None,
+    store: SessionStore | None = None,
     chat_service: ChatService | None = None,
 ) -> Flask:
     app = Flask(__name__)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    session_store = store or SessionStore()
+    session_store = store or InMemorySessionStore()
     app.config["SESSION_STORE"] = session_store
     app.config["CHAT_SERVICE"] = chat_service or ChatService(store=session_store)
 
@@ -87,7 +87,7 @@ def create_app(
                     yield f"event: delta\ndata: {event}\n\n"
 
                 yield "event: done\ndata: {}\n\n"
-            except (KeyError, ValueError) as error:
+            except (KeyError, ValueError, TruncatedReplyError) as error:
                 event = json.dumps({"message": str(error)})
                 yield f"event: error\ndata: {event}\n\n"
             except Exception:

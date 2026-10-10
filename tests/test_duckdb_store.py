@@ -108,3 +108,36 @@ def test_list_returns_summaries_without_messages():
         assert sessions[0].to_dict(include_messages=False)["title"] == "Later"
     finally:
         store.close()
+
+
+def test_adds_truncated_column_to_existing_database(tmp_path):
+    import duckdb
+
+    database_path = str(tmp_path / "old.duckdb")
+    old = duckdb.connect(database_path)
+    old.execute(
+        """
+        CREATE TABLE chat_messages (
+            id VARCHAR PRIMARY KEY,
+            session_id VARCHAR NOT NULL,
+            role VARCHAR NOT NULL,
+            content TEXT NOT NULL,
+            sources TEXT,
+            model VARCHAR DEFAULT '',
+            created_at VARCHAR NOT NULL
+        )
+        """
+    )
+    old.execute(
+        "INSERT INTO chat_messages VALUES ('m1', 's1', 'assistant', 'Old', '[]', 'm', '2026-01-01')"
+    )
+    old.close()
+
+    store = DuckDBSessionStore(database_path)
+    try:
+        messages = store.connection.execute(
+            "SELECT content, truncated FROM chat_messages"
+        ).fetchall()
+        assert messages == [("Old", False)]
+    finally:
+        store.close()

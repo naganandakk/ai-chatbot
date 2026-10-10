@@ -9,6 +9,7 @@ export type Message = {
   createdAt: string;
   sources: Source[];
   model: string;
+  truncated?: boolean;
 };
 
 export type SessionSummary = {

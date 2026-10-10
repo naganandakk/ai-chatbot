@@ -1,4 +1,4 @@
 from .models import ChatMessage, ChatSession
-from .store import SessionStore
+from .store import InMemorySessionStore, SessionStore
 
-__all__ = ["ChatMessage", "ChatSession", "SessionStore"]
+__all__ = ["ChatMessage", "ChatSession", "InMemorySessionStore", "SessionStore"]

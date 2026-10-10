@@ -1,8 +1,8 @@
-from core.chat_core.store import SessionStore
+from core.chat_core.store import InMemorySessionStore
 
 
 def test_first_user_message_becomes_session_title():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
 
     store.add_message(session.id, "user", "How do I build a chatbot?")
@@ -16,7 +16,7 @@ def test_first_user_message_becomes_session_title():
 
 
 def test_clear_removes_messages_and_resets_title():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
 
     store.add_message(session.id, "user", "A question")
@@ -29,7 +29,7 @@ def test_clear_removes_messages_and_resets_title():
 
 
 def test_missing_session_raises_key_error():
-    store = SessionStore()
+    store = InMemorySessionStore()
 
     try:
         store.clear("missing-session")

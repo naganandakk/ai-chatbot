@@ -10,6 +10,8 @@ const Sidebar = () => {
   const {
     sidebarOpen, setSidebarOpen,
     activeSession, setActiveSession,
+    setIsLoadingSession,
+    requestPromptFocus,
     sessions, setSessions,
     notifyError, notifySuccess,
     isGenerating, setIsGenerating,
@@ -21,13 +23,41 @@ const Sidebar = () => {
   const sidebarRef = useRef<HTMLElement>(null);
   const [pendingConfirm, setPendingConfirm] = useState<{ action: 'delete' | 'clear'; sessionId: string } | null>(null);
   const pendingConfirmSession = sessions.find(session => session.id === pendingConfirm?.sessionId);
+  // Only the latest session load may update the chat, so a slow earlier response can't overwrite a newer one
+  const latestLoadRequest = useRef(0);
+
+  async function loadSession(sessionId: string, fallbackError: string) {
+    const requestId = ++latestLoadRequest.current;
+    const isLatest = () => requestId === latestLoadRequest.current;
+
+    setIsLoadingSession(true);
+    try {
+      const session = await api.getSession(sessionId);
+      if (isLatest()) {
+        setActiveSession(session);
+      }
+    } catch (requestError) {
+      if (isLatest()) {
+        notifyError(requestError instanceof Error ? requestError.message : fallbackError);
+      }
+    } finally {
+      if (isLatest()) {
+        setIsLoadingSession(false);
+      }
+    }
+  }
+
+  function cancelSessionLoad() {
+    latestLoadRequest.current++;
+    setIsLoadingSession(false);
+  }
 
   async function refreshSessions () {
     try {
       const sessionList = await api.listSessions()
       setSessions(sessionList);
       if (sessionList.length > 0) {
-        setActiveSession(await api.getSession(sessionList[0].id));
+        await loadSession(sessionList[0].id, "Could not load sessions");
       }
     } catch (requestError) {
       notifyError(
@@ -46,15 +76,7 @@ const Sidebar = () => {
       return;
     }
 
-    try {
-      setActiveSession(await api.getSession(sessionId));
-    } catch (requestError) {
-      notifyError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not open the session",
-      );
-    }
+    await loadSession(sessionId, "Could not open the session");
   }
 
   function openConfirm(e: React.MouseEvent, action: 'delete' | 'clear', sessionId: string) {
@@ -209,7 +231,9 @@ const Sidebar = () => {
           {sidebarOpen && (
             <div onClick={() => {
               if (window.innerWidth < 768) setSidebarOpen(false);
+              cancelSessionLoad();
               setActiveSession(null);
+              requestPromptFocus();
             }} className={`text-sm flex items-center gap-2 w-full rounded-full cursor-pointer font-medium py-1 px-3 transition-all ${!activeSession ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
               <SquarePen size="16"/>
               <span>New Chat</span>
@@ -224,9 +248,11 @@ const Sidebar = () => {
             const isActive = chat.id === activeSession?.id;
             const isEditing = editingChatId === chat.id;
             const isMenuOpen = menuOpenId === chat.id;
+            // Other chats can't be opened while a reply streams into the active one
+            const isLocked = isGenerating && !isActive;
 
             return (
-              <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); if (window.innerWidth < 768) setSidebarOpen(false);}} className={`group relative flex items-center justify-between px-3 py-1 rounded-full cursor-pointer text-sm transition-colors ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
+              <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); if (window.innerWidth < 768) setSidebarOpen(false);}} className={`group relative flex items-center justify-between px-3 py-1 rounded-full text-sm transition-colors ${isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : `font-medium text-[#3c4043] dark:text-[#c4c7c5] ${isLocked ? '' : 'hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30]'}`}`}>
                 <div className="flex items-center truncate flex-1 mr-2">
                   {isEditing ? (
                     <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>

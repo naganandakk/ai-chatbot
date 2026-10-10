@@ -5,9 +5,17 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from core.chat_core.service import ChatService, ProviderStreamError
+from core.chat_core.providers import (
+    AnthropicProvider,
+    Citation,
+    OpenRouterProvider,
+    ProviderStreamError,
+    TextDelta,
+    TruncatedReplyError,
+)
+from core.chat_core.service import ChatService
 from core.chat_core.settings import Settings
-from core.chat_core.store import SessionStore
+from core.chat_core.store import InMemorySessionStore
 
 
 class FakeMessages:
@@ -33,11 +41,34 @@ class FakeClaudeClient:
         self.messages = FakeMessages()
 
 
+class FakeProvider:
+    def __init__(self, events: list) -> None:
+        self.events = events
+        self.calls: list[dict] = []
+
+    def stream(self, *, model, messages, tools):
+        self.calls.append({"model": model, "messages": messages, "tools": tools})
+        yield from self.events
+
+
+def anthropic_settings() -> Settings:
+    return Settings(provider="anthropic", api_key="test-key", model="test-model")
+
+
+def anthropic_service(store, client, tools_enabled=None) -> ChatService:
+    return ChatService(
+        store,
+        provider=AnthropicProvider(api_key="test-key", client=client),
+        settings=anthropic_settings(),
+        tools_enabled=tools_enabled,
+    )
+
+
 def test_stream_reply_saves_user_and_assistant_messages():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     client = FakeClaudeClient()
-    service = ChatService(store, client=client)
+    service = anthropic_service(store, client)
 
     chunks = list(service.stream_reply(session.id, "Say hello"))
 
@@ -54,10 +85,10 @@ def test_stream_reply_saves_user_and_assistant_messages():
 
 
 def test_stream_reply_uses_requested_model_and_records_it():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     client = FakeClaudeClient()
-    service = ChatService(store, client=client)
+    service = anthropic_service(store, client)
 
     list(service.stream_reply(session.id, "Say hello", model="claude-opus-5-5"))
 
@@ -70,10 +101,10 @@ def test_stream_reply_uses_requested_model_and_records_it():
 
 
 def test_stream_reply_falls_back_to_default_model_when_missing():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     client = FakeClaudeClient()
-    service = ChatService(store, client=client)
+    service = anthropic_service(store, client)
 
     list(service.stream_reply(session.id, "Say hello", model="  "))
 
@@ -85,9 +116,9 @@ def test_stream_reply_falls_back_to_default_model_when_missing():
 
 
 def test_stream_reply_rejects_empty_messages():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
-    service = ChatService(store, client=FakeClaudeClient())
+    service = anthropic_service(store, FakeClaudeClient())
 
     try:
         list(service.stream_reply(session.id, "   "))
@@ -95,6 +126,49 @@ def test_stream_reply_rejects_empty_messages():
         assert str(error) == "Message cannot be empty"
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_service_saves_events_from_any_provider():
+    store = InMemorySessionStore()
+    session = store.create()
+    provider = FakeProvider([
+        TextDelta("Hi"),
+        Citation(title="Docs", url="https://example.com/docs"),
+        TextDelta("!"),
+    ])
+    service = ChatService(
+        store,
+        provider=provider,
+        settings=anthropic_settings(),
+        tools_enabled=["web_search"],
+    )
+
+    chunks = list(service.stream_reply(session.id, "Hello"))
+
+    assistant = store.get(session.id).messages[1]
+    assert chunks == ["Hi", "!"]
+    assert assistant.content == "Hi!"
+    assert json.loads(assistant.sources) == [
+        {"title": "Docs", "url": "https://example.com/docs"}
+    ]
+    assert provider.calls == [
+        {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "tools": ["web_search"],
+        }
+    ]
+
+
+def test_anthropic_maps_enabled_tools_to_server_tools():
+    store = InMemorySessionStore()
+    session = store.create()
+    client = FakeClaudeClient()
+    service = anthropic_service(store, client, tools_enabled=["web_search"])
+
+    list(service.stream_reply(session.id, "Latest news"))
+
+    assert client.messages.requests[0]["tools"] == [{"type": "web_search"}]
 
 
 def openrouter_sse(*payloads: dict) -> str:
@@ -143,15 +217,24 @@ def openrouter_settings() -> Settings:
     )
 
 
+def openrouter_service(store, transport, tools_enabled=None) -> ChatService:
+    return ChatService(
+        store,
+        provider=OpenRouterProvider(api_key="openrouter-key", transport=transport),
+        settings=openrouter_settings(),
+        tools_enabled=tools_enabled,
+    )
+
+
 def test_openrouter_stream_reply_uses_openrouter_sdk_and_saves_messages():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     requests: list[dict] = []
     transport = openrouter_transport(
         [openrouter_chunk("Hello"), openrouter_chunk(" world")],
         requests,
     )
-    service = ChatService(store, settings=openrouter_settings(), openrouter_transport=transport)
+    service = openrouter_service(store, transport)
 
     chunks = list(service.stream_reply(session.id, "Say hello"))
 
@@ -163,21 +246,17 @@ def test_openrouter_stream_reply_uses_openrouter_sdk_and_saves_messages():
     assert saved_session.messages[1].model == "anthropic/claude-haiku-4.5"
     assert requests[0]["stream"] is True
     assert requests[0]["max_completion_tokens"] == 2048
+    assert requests[0]["reasoning"] == {"effort": "none"}
     assert requests[0]["messages"] == [{"role": "user", "content": "Say hello"}]
     assert "plugins" not in requests[0]
 
 
 def test_openrouter_web_search_tool_enables_web_plugin():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     requests: list[dict] = []
     transport = openrouter_transport([openrouter_chunk("Hi")], requests)
-    service = ChatService(
-        store,
-        settings=openrouter_settings(),
-        openrouter_transport=transport,
-        tools_enabled=["web_search"],
-    )
+    service = openrouter_service(store, transport, tools_enabled=["web_search"])
 
     list(service.stream_reply(session.id, "Latest news"))
 
@@ -185,7 +264,7 @@ def test_openrouter_web_search_tool_enables_web_plugin():
 
 
 def test_openrouter_url_citations_are_saved_as_sources():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     requests: list[dict] = []
     citation = url_citation("Python Downloads", "https://www.python.org/downloads/")
@@ -197,12 +276,7 @@ def test_openrouter_url_citations_are_saved_as_sources():
         ],
         requests,
     )
-    service = ChatService(
-        store,
-        settings=openrouter_settings(),
-        openrouter_transport=transport,
-        tools_enabled=["web_search"],
-    )
+    service = openrouter_service(store, transport, tools_enabled=["web_search"])
 
     list(service.stream_reply(session.id, "Latest Python?"))
 
@@ -216,7 +290,7 @@ def test_openrouter_url_citations_are_saved_as_sources():
 
 
 def test_openrouter_stream_error_raises_and_skips_assistant_message():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     requests: list[dict] = []
     error_chunk = {
@@ -231,7 +305,7 @@ def test_openrouter_stream_error_raises_and_skips_assistant_message():
         [openrouter_chunk("Par"), error_chunk],
         requests,
     )
-    service = ChatService(store, settings=openrouter_settings(), openrouter_transport=transport)
+    service = openrouter_service(store, transport)
 
     with pytest.raises(ProviderStreamError, match="Upstream overloaded"):
         list(service.stream_reply(session.id, "Say hello"))
@@ -241,7 +315,7 @@ def test_openrouter_stream_error_raises_and_skips_assistant_message():
 
 
 def test_openrouter_client_is_reused_and_citations_do_not_leak_between_replies():
-    store = SessionStore()
+    store = InMemorySessionStore()
     session = store.create()
     requests: list[dict] = []
     first = url_citation("First", "https://example.com/first")
@@ -259,25 +333,21 @@ def test_openrouter_client_is_reused_and_citations_do_not_leak_between_replies()
             stream=httpx.ByteStream(openrouter_sse(*next(replies)).encode()),
         )
 
-    service = ChatService(
-        store,
-        settings=openrouter_settings(),
-        openrouter_transport=httpx.MockTransport(handler),
-    )
+    service = openrouter_service(store, httpx.MockTransport(handler))
+    client = service.provider._client
 
     list(service.stream_reply(session.id, "First question"))
-    client = service._openrouter
     list(service.stream_reply(session.id, "Second question"))
 
     messages = store.get(session.id).messages
-    assert service._openrouter is client
+    assert service.provider._client is client
     assert len(requests) == 2
     assert json.loads(messages[1].sources) == [{"title": "First", "url": "https://example.com/first"}]
     assert json.loads(messages[3].sources) == [{"title": "Second", "url": "https://example.com/second"}]
 
 
 def test_concurrent_openrouter_replies_keep_their_own_citations():
-    store = SessionStore()
+    store = InMemorySessionStore()
     sessions = [store.create(), store.create()]
     citations = {
         "alpha": url_citation("Alpha", "https://example.com/alpha"),
@@ -297,11 +367,7 @@ def test_concurrent_openrouter_replies_keep_their_own_citations():
             ).encode()),
         )
 
-    service = ChatService(
-        store,
-        settings=openrouter_settings(),
-        openrouter_transport=httpx.MockTransport(handler),
-    )
+    service = openrouter_service(store, httpx.MockTransport(handler))
 
     def run(session_id: str, prompt: str) -> None:
         "".join(service.stream_reply(session_id, prompt))
@@ -321,3 +387,96 @@ def test_concurrent_openrouter_replies_keep_their_own_citations():
         assert json.loads(assistant.sources) == [
             {"title": citation["title"], "url": citation["url"]}
         ]
+
+
+def test_openrouter_reply_cut_off_before_any_text_raises_and_skips_assistant_message():
+    store = InMemorySessionStore()
+    session = store.create()
+    requests: list[dict] = []
+    cut_off = openrouter_chunk("")
+    cut_off["choices"][0]["finish_reason"] = "length"
+    transport = openrouter_transport([cut_off], requests)
+    service = openrouter_service(store, transport)
+
+    with pytest.raises(TruncatedReplyError, match="token limit"):
+        list(service.stream_reply(session.id, "Explain everything"))
+
+    saved_session = store.get(session.id)
+    assert [message.role for message in saved_session.messages] == ["user"]
+
+
+class TruncatedMessages:
+    def create(self, **kwargs):
+        return [
+            SimpleNamespace(
+                type="message_delta",
+                delta=SimpleNamespace(stop_reason="max_tokens"),
+            ),
+        ]
+
+
+def test_anthropic_reply_cut_off_before_any_text_raises():
+    store = InMemorySessionStore()
+    session = store.create()
+    client = SimpleNamespace(messages=TruncatedMessages())
+    service = anthropic_service(store, client)
+
+    with pytest.raises(TruncatedReplyError):
+        list(service.stream_reply(session.id, "Explain everything"))
+
+    assert [message.role for message in store.get(session.id).messages] == ["user"]
+
+
+def test_openrouter_reply_cut_off_after_text_is_saved_as_truncated():
+    store = InMemorySessionStore()
+    session = store.create()
+    requests: list[dict] = []
+    cut_off = openrouter_chunk("Partial answer")
+    cut_off["choices"][0]["finish_reason"] = "length"
+    transport = openrouter_transport([cut_off], requests)
+    service = openrouter_service(store, transport)
+
+    chunks = list(service.stream_reply(session.id, "Explain everything"))
+
+    assistant = store.get(session.id).messages[1]
+    assert chunks == ["Partial answer"]
+    assert assistant.content == "Partial answer"
+    assert assistant.truncated is True
+
+
+def test_complete_openrouter_reply_is_not_truncated():
+    store = InMemorySessionStore()
+    session = store.create()
+    transport = openrouter_transport([openrouter_chunk("Done")], [])
+    service = openrouter_service(store, transport)
+
+    list(service.stream_reply(session.id, "Hi"))
+
+    assert store.get(session.id).messages[1].truncated is False
+
+
+class TruncatedAfterTextMessages:
+    def create(self, **kwargs):
+        return [
+            SimpleNamespace(
+                type="content_block_delta",
+                delta=SimpleNamespace(type="text_delta", text="Partial"),
+            ),
+            SimpleNamespace(
+                type="message_delta",
+                delta=SimpleNamespace(stop_reason="max_tokens"),
+            ),
+        ]
+
+
+def test_anthropic_reply_cut_off_after_text_is_saved_as_truncated():
+    store = InMemorySessionStore()
+    session = store.create()
+    client = SimpleNamespace(messages=TruncatedAfterTextMessages())
+    service = anthropic_service(store, client)
+
+    chunks = list(service.stream_reply(session.id, "Explain everything"))
+
+    assistant = store.get(session.id).messages[1]
+    assert chunks == ["Partial"]
+    assert assistant.truncated is True

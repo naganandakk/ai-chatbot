@@ -1,12 +1,10 @@
-from anthropic import APIError
-from openrouter.errors import OpenRouterError
-
-from core.chat_core.service import ChatService, ProviderStreamError
-from core.chat_core.store import SessionStore
+from core.chat_core.providers import ProviderError
+from core.chat_core.service import ChatService
+from core.chat_core.store import InMemorySessionStore
 
 
 def main() -> None:
-    store = SessionStore()
+    store = InMemorySessionStore()
     service = ChatService(store)
     session = store.create()
 
@@ -44,7 +42,7 @@ def main() -> None:
             print()
         except RuntimeError as error:
             print(f"\nConfiguration error: {error}")
-        except (APIError, OpenRouterError, ProviderStreamError) as error:
+        except ProviderError as error:
             print(f"\nRequest failed: {error}")
 
 

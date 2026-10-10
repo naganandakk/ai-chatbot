@@ -1,5 +1,5 @@
 import {
-  ArrowDown, Bot, Sparkles, Code, Compass
+  ArrowDown, Sparkles, Code, Compass
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from "react-markdown";
@@ -16,6 +16,7 @@ import PromptInput from './PromptInput';
 const ChatContainer = () => {
   const {
     activeSession,
+    isLoadingSession,
     isGenerating,
     setInputMessage
   } = useAppContext();
@@ -84,19 +85,6 @@ const ChatContainer = () => {
     }
     setCopyableIdx(copyableIdx === idx ? null : idx);
   };
-  const streamingIcon = (
-    isGenerating && (
-      <div className="flex items-start gap-4 justify-start">
-        <div className="w-8 h-8 rounded-full bg-[#1a73e8] flex items-center justify-center text-white flex-shrink-0 animate-pulse-slow"><Bot className="w-4 h-4" /></div>
-        <div className="border border-[#dadce0]/60 dark:border-[#3c4043] rounded-2xl rounded-tl-none px-4 py-3">
-          <div className="flex items-center gap-1.5 py-1">
-            <div className="w-2 h-2 rounded-full bg-[#1a73e8] animate-bounce"></div>
-            <div className="w-2 h-2 rounded-full bg-[#1a73e8] animate-bounce" style={{ animationDelay: '150ms' }}></div>
-          </div>
-        </div>
-      </div>
-    )
-  );
   const newChat = (
     <div className="flex flex-col items-center justify-center h-[65vh] text-center px-4">
       <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg mb-6 text-white">
@@ -122,13 +110,13 @@ const ChatContainer = () => {
           // Gives the latest reply enough height to scroll its start to the top while it streams
           className={isGenerating && idx === (activeSession?.messages.length ?? 0) - 1 ? 'min-h-[100dvh]' : undefined}
         >
-          <div className={`flex items-start gap-4 justify-end`} data-user-message={msg.role === 'user' ? idx : undefined}>
+          <div className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`} data-user-message={msg.role === 'user' ? idx : undefined}>
             {msg.role === 'user' && copyableIdx === idx && (
               <CopyMessageBtn text={msg.content} onHide={hideCopyable} />
             )}
             <div
               onClick={msg.role === 'user' ? () => toggleCopyable(idx) : undefined}
-              className={`max-w-[100%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none cursor-pointer' : 'rounded-tl-none'}`}>
+              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'max-w-[100%] bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none cursor-pointer' : 'w-full rounded-tl-none'}`}>
               <div className="whitespace-pre-wrap" id={`response-${idx}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -242,11 +230,28 @@ const ChatContainer = () => {
                   {msg.content}
                 </ReactMarkdown>
               </div>
+              {/* Shown after the streamed text, so it moves with the reply as it grows */}
+              {isGenerating && msg.role === 'assistant' && idx === (activeSession?.messages.length ?? 0) - 1 && (
+                <div role="status" className="flex items-center gap-2 pt-2 text-xs text-[#5f6368] dark:text-[#9aa0a6]">
+                  <Sparkles className="w-4 h-4 text-[#1a73e8] dark:text-[#8ab4f8] animate-pulse" />
+                  <span>Generating</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <div className="mt-2 flex items-center gap-2">
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
               <CopyResponseBtn targetId={`response-${idx}`} />
+            )}
+            {msg.truncated && (
+              <span className="text-xs text-[#b06000] dark:text-[#fdd663]">
+                Reply stopped at the length limit
+              </span>
             )}
             <SourcesBtn sources={msg.sources} id={idx} />
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
@@ -260,10 +265,15 @@ const ChatContainer = () => {
         </div>
       ))
     }
-    {streamingIcon}
   </>
   );
-  const chatContainerContent = !activeSession || activeSession?.messages.length === 0 ? newChat : messageList
+  const sessionLoader = (
+    <div role="status" className="flex flex-col items-center justify-center h-[65vh] gap-3 text-sm text-[#5f6368] dark:text-[#9aa0a6]">
+      <div className="w-8 h-8 rounded-full border-[3px] border-[#dadce0] dark:border-[#3c4043] border-t-[#1a73e8] dark:border-t-[#8ab4f8] animate-spin" />
+      <span>Loading chat…</span>
+    </div>
+  );
+  const chatContainerContent = isLoadingSession ? sessionLoader : !activeSession || activeSession?.messages.length === 0 ? newChat : messageList
 
   return (
     <>

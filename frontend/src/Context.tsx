@@ -42,8 +42,11 @@ export const useAppContext = (): AppContextValue => {
   return value;
 };
 
+let errorCounter = 0;
+
 export const ContextProvider = ({ children }: { children: React.ReactNode }) => {
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  // Open by default on desktop only, so the sidebar overlay doesn't cover the chat on phones
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => window.matchMedia('(min-width: 768px)').matches);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -58,7 +61,8 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   }, []);
 
   const triggerError = useCallback((message: string) => {
-    const id = crypto.randomUUID(); // Unique ID for every independent error
+    // crypto.randomUUID is unavailable on plain-HTTP origins, so use a counter-based ID instead
+    const id = `${Date.now()}-${++errorCounter}`;
 
     setErrors((prev) => [...prev, { id, message }]);
 

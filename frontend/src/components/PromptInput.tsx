@@ -50,9 +50,18 @@ const PromptInput = () => {
         model: "",
       };
 
+      // Empty assistant message that the streamed chunks fill in
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: "",
+        createdAt: new Date().toISOString(),
+        sources: [],
+        model: "",
+      };
+
       setActiveSession({
         ...session,
-        messages: [...session.messages, userMessage],
+        messages: [...session.messages, userMessage, assistantMessage],
       });
 
       await api.streamMessage(session.id, userText, (chunk) => {
@@ -87,6 +96,14 @@ const PromptInput = () => {
         ])
       }
     } catch (requestError) {
+      // Drop the empty assistant placeholder so no copy or sources buttons are left behind
+      setActiveSession((currentSession) => {
+        const lastMessage = currentSession?.messages[currentSession.messages.length - 1];
+        if (!currentSession || lastMessage?.role !== "assistant" || lastMessage.content) {
+          return currentSession;
+        }
+        return { ...currentSession, messages: currentSession.messages.slice(0, -1) };
+      });
       triggerError(
         requestError instanceof Error
           ? requestError.message
@@ -99,7 +116,7 @@ const PromptInput = () => {
 
   return (
     <form onSubmit={handleSendMessage} className="relative flex items-center bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border border-transparent focus-within:border-[#dadce0]">
-      <input type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder="Enter a prompt here..." className="w-full bg-transparent py-4 pl-6 pr-14 text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
+      <input type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder="Enter a prompt here..." className="w-full bg-transparent py-4 pl-6 pr-14 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
       <button type="submit" disabled={!inputMessage.trim() || isGenerating} className={`absolute right-3 p-2 rounded-full ${inputMessage.trim() && !isGenerating ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
         <Send className="w-4 h-4" />
       </button>

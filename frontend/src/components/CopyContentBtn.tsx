@@ -1,5 +1,6 @@
 // CopyContentBtn.tsx
 import React, { useState } from 'react';
+import { writeClipboard } from '../clipboard';
 
 interface CopyContentBtnProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ const CopyContentBtn = ({ children }: CopyContentBtnProps) => {
     const textToCopy = childProps?.children || '';
 
     try {
-      await navigator.clipboard.writeText(String(textToCopy));
+      await writeClipboard(String(textToCopy));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {

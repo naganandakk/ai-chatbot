@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useAppContext } from '../Context';
+import { writeClipboard } from '../clipboard';
 
 const HIDE_AFTER_MS = 5000;
 
@@ -25,7 +26,7 @@ const CopyMessageBtn = ({ text, onHide }: CopyMessageBtnProps) => {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await writeClipboard(text);
       setCopied(true);
     } catch (err) {
       console.error('Failed to copy message: ', err);

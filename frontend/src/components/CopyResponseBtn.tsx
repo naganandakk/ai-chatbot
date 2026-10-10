@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useAppContext } from '../Context';
+import { writeClipboard } from '../clipboard';
 
 const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'PRE', 'TR', 'UL', 'OL', 'TABLE']);
 
@@ -96,7 +97,7 @@ const CopyResponseBtn = ({ targetId }: CopyResponseBtnProps) => {
     const html = getRichHtml(target);
 
     try {
-      if ('ClipboardItem' in window) {
+      if (navigator.clipboard?.write && 'ClipboardItem' in window) {
         await navigator.clipboard.write([
           new ClipboardItem({
             'text/html': new Blob([html], { type: 'text/html' }),
@@ -104,7 +105,7 @@ const CopyResponseBtn = ({ targetId }: CopyResponseBtnProps) => {
           }),
         ]);
       } else {
-        await navigator.clipboard.writeText(text);
+        await writeClipboard(text);
       }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

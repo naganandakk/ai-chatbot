@@ -136,7 +136,7 @@ const Sidebar = () => {
 
   useEffect(() => {
     const handleClickOutside = (event: PointerEvent) => {
-      if (chatActionsRef.current && !chatActionsRef.current.contains(event.target as Node)) {
+      if (!chatActionsRef.current?.contains(event.target as Node)) {
         setMenuOpenId(null);
       }
     };
@@ -216,8 +216,8 @@ const Sidebar = () => {
                 </div>
 
                 {!isEditing && (
-                  <div className="relative" ref={chatActionsRef}>
-                    <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity">
+                  <div className="relative" ref={isMenuOpen ? chatActionsRef : undefined}>
+                    <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-black/10 transition-opacity">
                       <MoreVertical className="w-4 h-4 text-[#5f6368]" />
                     </button>
                     {isMenuOpen && (

@@ -45,6 +45,21 @@ const ChatContainer = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   };
 
+  // Scrolls the new response to the top of the view when a prompt is submitted
+  useEffect(() => {
+    const container = scrollRef.current;
+    const responses = container?.querySelectorAll<HTMLElement>('[data-assistant-message]');
+    const latestResponse = responses?.[responses.length - 1];
+    if (!container || !isGenerating || !latestResponse) {
+      return;
+    }
+
+    const top = latestResponse.getBoundingClientRect().top
+      - container.getBoundingClientRect().top
+      + container.scrollTop;
+    container.scrollTo({ top, behavior: 'smooth' });
+  }, [isGenerating]);
+
   // Hides the copy button when the user clicks anywhere outside its message
   useEffect(() => {
     if (copyableIdx === null) {
@@ -101,7 +116,12 @@ const ChatContainer = () => {
   const messageList = (
     <>
       {activeSession?.messages.map((msg: Message, idx: number) => (
-        <div key={idx}>
+        <div
+          key={idx}
+          data-assistant-message={msg.role === 'assistant' ? idx : undefined}
+          // Gives the latest reply enough height to scroll its start to the top while it streams
+          className={isGenerating && idx === (activeSession?.messages.length ?? 0) - 1 ? 'min-h-[100dvh]' : undefined}
+        >
           <div className={`flex items-start gap-4 justify-end`} data-user-message={msg.role === 'user' ? idx : undefined}>
             {msg.role === 'user' && copyableIdx === idx && (
               <CopyMessageBtn text={msg.content} onHide={hideCopyable} />

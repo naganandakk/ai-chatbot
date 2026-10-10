@@ -47,7 +47,7 @@ class DuckDBSessionStore:
 
         message_rows = self.connection.execute(
             """
-            SELECT role, content, sources, created_at
+            SELECT role, content, sources, model, created_at
             FROM chat_messages
             WHERE session_id = ?
             ORDER BY created_at, id
@@ -56,8 +56,14 @@ class DuckDBSessionStore:
         ).fetchall()
 
         messages = [
-            ChatMessage(role=role, content=content, created_at=created_at, sources=sources)
-            for role, content, sources, created_at in message_rows
+            ChatMessage(
+                role=role,
+                content=content,
+                created_at=created_at,
+                sources=sources or "",
+                model=model or "",
+            )
+            for role, content, sources, model, created_at in message_rows
         ]
 
         return ChatSession(
@@ -88,10 +94,11 @@ class DuckDBSessionStore:
         session_id: str,
         role: str,
         content: str,
-        sources: str = ""
+        sources: str = "",
+        model: str = "",
     ) -> ChatMessage:
         session = self._require(session_id)
-        message = ChatMessage(role=role, content=content, sources=sources)
+        message = ChatMessage(role=role, content=content, sources=sources, model=model)
         title = session.title
 
         if role == "user" and title == "New chat":
@@ -99,8 +106,8 @@ class DuckDBSessionStore:
 
         self.connection.execute(
             """
-            INSERT INTO chat_messages (id, session_id, role, content, sources, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO chat_messages (id, session_id, role, content, sources, model, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 str(uuid4()),
@@ -108,6 +115,7 @@ class DuckDBSessionStore:
                 message.role,
                 message.content,
                 message.sources,
+                message.model,
                 message.created_at,
             ],
         )
@@ -199,9 +207,14 @@ class DuckDBSessionStore:
                 role VARCHAR NOT NULL,
                 content TEXT NOT NULL,
                 sources TEXT,
+                model VARCHAR DEFAULT '',
                 created_at VARCHAR NOT NULL
             )
             """
+        )
+        # Databases created before the model column existed need it added in place.
+        self.connection.execute(
+            "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS model VARCHAR DEFAULT ''"
         )
         self.connection.execute(
             """

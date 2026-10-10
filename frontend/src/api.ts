@@ -8,6 +8,7 @@ export type Message = {
   content: string;
   createdAt: string;
   sources: Source[];
+  model: string;
 };
 
 export type SessionSummary = {

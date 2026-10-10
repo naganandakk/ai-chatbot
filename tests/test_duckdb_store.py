@@ -21,6 +21,24 @@ def test_creates_chat_tables_in_memory():
     finally:
         store.close()
 
+def test_stores_model_on_messages():
+    store = DuckDBSessionStore(":memory:")
+
+    try:
+        session = store.create()
+
+        store.add_message(session.id, "user", "Hi")
+        store.add_message(session.id, "assistant", "Hello", "[]", "claude-haiku-5-5")
+
+        saved_session = store.get(session.id)
+
+        assert saved_session is not None
+        assert [message.model for message in saved_session.messages] == ["", "claude-haiku-5-5"]
+        assert saved_session.to_dict()["messages"][1]["model"] == "claude-haiku-5-5"
+    finally:
+        store.close()
+
+
 def test_stores_messages_and_clears_a_session():
     store = DuckDBSessionStore(":memory:")
 

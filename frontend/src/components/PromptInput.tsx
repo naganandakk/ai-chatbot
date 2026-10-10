@@ -47,6 +47,7 @@ const PromptInput = () => {
         content: userText,
         createdAt: new Date().toISOString(),
         sources: [],
+        model: "",
       };
 
       setActiveSession({

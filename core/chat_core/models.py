@@ -15,12 +15,14 @@ class ChatMessage:
     content: str
     created_at: str = field(default_factory=utc_now)
     sources: str = ""
+    model: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "content": self.content,
             "sources": json.loads(self.sources.strip()) if self.sources.strip() else [],
+            "model": self.model,
             "createdAt": self.created_at,
         }
 

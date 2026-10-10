@@ -78,10 +78,11 @@ def create_app(
     def send_message(session_id: str):
         payload = request.get_json(silent=False) or {}
         prompt = payload.get("message", "")
+        model = payload.get("model")
 
         def generate():
             try:
-                for chunk in app.config["CHAT_SERVICE"].stream_reply(session_id, prompt):
+                for chunk in app.config["CHAT_SERVICE"].stream_reply(session_id, prompt, model):
                     event = json.dumps({"text": chunk})
                     yield f"event: delta\ndata: {event}\n\n"
 

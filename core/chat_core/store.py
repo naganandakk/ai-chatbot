@@ -20,9 +20,16 @@ class SessionStore:
             reverse=True,
         )
 
-    def add_message(self, session_id: str, role: str, content: str, sources: str = "") -> ChatMessage:
+    def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        sources: str = "",
+        model: str = "",
+    ) -> ChatMessage:
         session = self._require(session_id)
-        message = ChatMessage(role=role, content=content)
+        message = ChatMessage(role=role, content=content, sources=sources, model=model)
         session.messages.append(message)
 
         if role == "user" and session.title == "New chat":

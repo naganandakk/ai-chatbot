@@ -21,7 +21,7 @@ class ChatService:
         self.settings = settings
         self.tools_enabled = tools_enabled if tools_enabled else []
 
-    def stream_reply(self, session_id: str, prompt: str) -> Iterator[str]:
+    def stream_reply(self, session_id: str, prompt: str, model: str | None = None) -> Iterator[str]:
         message = prompt.strip()
         if not message:
             raise ValueError("Message cannot be empty")
@@ -37,9 +37,10 @@ class ChatService:
             for chat_message in session.messages
         ]
         settings = self._settings()
+        model = (model or "").strip() or settings.model
 
         params = {
-            "model": settings.model,
+            "model": model,
             "max_tokens": 2048,
             "messages": conversation,
             "stream": True
@@ -64,7 +65,13 @@ class ChatService:
                 chunks.append(event.delta.text)
                 yield event.delta.text
 
-        self.store.add_message(session_id, "assistant", "".join(chunks), json.dumps(sources))
+        self.store.add_message(
+            session_id,
+            "assistant",
+            "".join(chunks),
+            json.dumps(sources),
+            model,
+        )
 
     def _client(self, settings: Settings) -> Anthropic:
         if self.client is not None:

@@ -6,11 +6,11 @@ class FakeChatService:
     def __init__(self, store: SessionStore) -> None:
         self.store = store
 
-    def stream_reply(self, session_id: str, prompt: str):
+    def stream_reply(self, session_id: str, prompt: str, model: str | None = None):
         self.store.add_message(session_id, "user", prompt)
         yield "Hello"
         yield " world"
-        self.store.add_message(session_id, "assistant", "Hello world")
+        self.store.add_message(session_id, "assistant", "Hello world", "[]", model or "")
 
 
 def test_streaming_message_endpoint():

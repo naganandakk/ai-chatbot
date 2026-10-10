@@ -10,6 +10,7 @@ import CopyMessageBtn from './CopyMessageBtn';
 import CopyResponseBtn from './CopyResponseBtn';
 import { useAppContext } from "../Context";
 import SourcesBtn from "./SourcesBtn";
+import MoreOptionsBtn from './MoreOptionsBtn';
 import PromptInput from './PromptInput';
 
 const ChatContainer = () => {
@@ -206,6 +207,9 @@ const ChatContainer = () => {
               <CopyResponseBtn targetId={`response-${idx}`} />
             )}
             <SourcesBtn sources={msg.sources} id={idx} />
+            {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
+              <MoreOptionsBtn model={msg.model} content={msg.content} />
+            )}
           </div>
         </div>
       ))

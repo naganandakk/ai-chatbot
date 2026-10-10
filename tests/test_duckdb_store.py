@@ -1,3 +1,5 @@
+import threading
+
 from core.chat_core.duckdb_store import DuckDBSessionStore
 
 
@@ -62,5 +64,47 @@ def test_stores_messages_and_clears_a_session():
 
         assert cleared_session.title == "New chat"
         assert cleared_session.messages == []
+    finally:
+        store.close()
+
+def test_concurrent_reads_never_lose_sessions():
+    store = DuckDBSessionStore(":memory:")
+    session_ids = [store.create().id for _ in range(10)]
+    missing = []
+
+    def read_all():
+        for _ in range(50):
+            for session_id in session_ids:
+                if store.get(session_id) is None:
+                    missing.append(session_id)
+
+    try:
+        threads = [threading.Thread(target=read_all) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert missing == []
+    finally:
+        store.close()
+
+
+def test_list_returns_summaries_without_messages():
+    store = DuckDBSessionStore(":memory:")
+
+    try:
+        older = store.create()
+        newer = store.create()
+        store.add_message(older.id, "user", "Hello there")
+        store.add_message(newer.id, "user", "Later")
+        store.add_message(newer.id, "assistant", "Reply", "[]", "claude-haiku-5-5")
+
+        sessions = store.list()
+
+        assert [session.id for session in sessions] == [newer.id, older.id]
+        assert all(session.messages == [] for session in sessions)
+        assert sessions[1].title == "Hello there"
+        assert sessions[0].to_dict(include_messages=False)["title"] == "Later"
     finally:
         store.close()

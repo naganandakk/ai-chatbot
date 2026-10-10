@@ -183,7 +183,7 @@ uv run gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:5000 backend.app.wsgi:a
 Keep these settings in mind:
 
 - `--workers 1` is required. `backend.app.wsgi` opens the DuckDB file when it is imported, and DuckDB takes a write lock, so a second worker cannot open the same file.
-- The default worker class is `sync`, which serves one request at a time. A streaming reply holds the worker until it finishes, so other requests wait. Do not raise `--threads` yet: the store shares one DuckDB connection across requests, and that connection is not safe to use from multiple threads.
+- The default worker class is `sync`, which serves one request at a time. A streaming reply holds the worker until it finishes, so other requests wait. The store serializes its DuckDB calls with a lock, so threads are safe to use. Raising `--threads` also needs `--worker-class gthread`, because the `sync` worker ignores it.
 - `--timeout 120` replaces Gunicorn's default of 30 seconds. A sync worker does not report progress while handling a request, so a slow model reply could otherwise get the worker killed. Set this to the longest reply you expect.
 
 DuckDB is appropriate for one backend process. Do not run multiple Gunicorn workers or multiple application instances against the same write-enabled DuckDB file. For horizontal scaling or higher write concurrency, migrate session storage to PostgreSQL.

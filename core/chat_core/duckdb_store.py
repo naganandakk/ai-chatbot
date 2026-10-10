@@ -1,3 +1,5 @@
+import threading
+from functools import wraps
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,14 +8,27 @@ import duckdb
 from .models import ChatMessage, ChatSession, utc_now
 
 
+def _serialized(method):
+    # One connection is shared by every request thread, and DuckDB connections are not
+    # thread-safe. Hold the store lock so concurrent requests never interleave queries.
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class DuckDBSessionStore:
     def __init__(self, database_path: str) -> None:
         if database_path != ":memory:":
             Path(database_path).parent.mkdir(parents=True, exist_ok=True)
 
+        self._lock = threading.RLock()
         self.connection = duckdb.connect(database_path)
         self._initialize_schema()
 
+    @_serialized
     def create(self) -> ChatSession:
         session = ChatSession()
 
@@ -32,6 +47,7 @@ class DuckDBSessionStore:
 
         return session
 
+    @_serialized
     def get(self, session_id: str) -> ChatSession | None:
         row = self.connection.execute(
             """
@@ -74,21 +90,28 @@ class DuckDBSessionStore:
             updated_at=row[3],
         )
 
+    @_serialized
     def list(self) -> list[ChatSession]:
+        # Summaries only: messages are not loaded, since callers never read them here.
         rows = self.connection.execute(
             """
-            SELECT id
+            SELECT id, title, created_at, updated_at
             FROM chat_sessions
             ORDER BY updated_at DESC
             """
         ).fetchall()
 
         return [
-            session
+            ChatSession(
+                id=row[0],
+                title=row[1],
+                created_at=row[2],
+                updated_at=row[3],
+            )
             for row in rows
-            if (session := self.get(row[0])) is not None
         ]
 
+    @_serialized
     def add_message(
         self,
         session_id: str,
@@ -130,6 +153,7 @@ class DuckDBSessionStore:
 
         return message
 
+    @_serialized
     def clear(self, session_id: str) -> ChatSession:
         self._require(session_id)
         updated_at = utc_now()
@@ -154,6 +178,7 @@ class DuckDBSessionStore:
 
         return cleared_session
 
+    @_serialized
     def delete(self, session_id: str) -> None:
         self._require(session_id)
 
@@ -166,6 +191,7 @@ class DuckDBSessionStore:
             [session_id],
         )
 
+    @_serialized
     def update(self, session_id: str, title: str) -> ChatSession:
         self._require(session_id)
 

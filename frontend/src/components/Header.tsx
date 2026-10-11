@@ -4,6 +4,7 @@ import {
 import { useAppContext } from "../Context";
 import { useIsDesktop } from "../useIsDesktop";
 import ModelPicker from "./ModelPicker";
+import SessionUsage from "./SessionUsage";
 
 const Header = () => {
   const {
@@ -12,7 +13,7 @@ const Header = () => {
   const isDesktop = useIsDesktop();
 
   return (
-    <header className="h-16 flex items-center gap-3 px-4 shrink-0">
+    <header className="h-14 md:h-16 flex items-center gap-3 px-4 shrink-0">
       {!sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
@@ -22,15 +23,11 @@ const Header = () => {
           <Menu className="w-5 h-5" />
         </button>
       )}
-      <h2 className="md:hidden text-md font-bold text-[#202124] dark:text-[#e3e3e3] truncate">
-        AI Chatbot
-      </h2>
-      {/* On phones the picker moves here, so the prompt gets the full width */}
-      {!isDesktop && (
-        <div className="ml-auto">
-          <ModelPicker />
-        </div>
-      )}
+      <div className="ml-auto flex items-center gap-2">
+        <SessionUsage />
+        {/* On phones the picker moves here, so the prompt gets the full width */}
+        {!isDesktop && <ModelPicker />}
+      </div>
     </header>
   )
 }

@@ -4,6 +4,7 @@ import os
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
+from core.chat_core.models import summarize_usage
 from core.chat_core.providers import (
     ProviderError,
     ReplyReset,
@@ -129,9 +130,12 @@ def create_app(
                         yield f"event: delta\ndata: {event}\n\n"
 
                 session = session_store.get(session_id)
+                # The summary has no messages, so the session's usage totals are added to it
+                summary = session.to_dict(include_messages=False)
+                summary["usage"] = summarize_usage(session.messages).to_dict()
                 event = {
                     "message": reply.to_dict(),
-                    "session": session.to_dict(include_messages=False),
+                    "session": summary,
                 }
                 yield f"event: done\ndata: {json.dumps(event)}\n\n"
             except (KeyError, ValueError, TruncatedReplyError) as error:

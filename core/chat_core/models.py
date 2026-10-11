@@ -47,6 +47,53 @@ def _usage_to_dict(raw: str) -> dict[str, Any] | None:
     }
 
 
+@dataclass(frozen=True)
+class UsageSummary:
+    input_tokens: int = 0
+    output_tokens: int = 0
+    # None when no reply in the session has a known cost
+    cost_usd: float | None = None
+    priced_messages: int = 0
+    unpriced_messages: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "inputTokens": self.input_tokens,
+            "outputTokens": self.output_tokens,
+            "costUsd": self.cost_usd,
+            "pricedMessages": self.priced_messages,
+            "unpricedMessages": self.unpriced_messages,
+        }
+
+
+def summarize_usage(messages: list[ChatMessage]) -> UsageSummary:
+    # Only replies carry usage. The cost is summed over the priced replies, and the unpriced
+    # count tells the client the total is partial.
+    input_tokens = output_tokens = priced = unpriced = 0
+    cost_usd = 0.0
+
+    for message in messages:
+        if not message.usage.strip():
+            continue
+
+        usage = json.loads(message.usage)
+        input_tokens += usage["input_tokens"]
+        output_tokens += usage["output_tokens"]
+        if usage["cost_usd"] is None:
+            unpriced += 1
+        else:
+            priced += 1
+            cost_usd += usage["cost_usd"]
+
+    return UsageSummary(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=cost_usd if priced else None,
+        priced_messages=priced,
+        unpriced_messages=unpriced,
+    )
+
+
 @dataclass
 class ChatSession:
     id: str = field(default_factory=lambda: str(uuid4()))
@@ -64,4 +111,5 @@ class ChatSession:
         }
         if include_messages:
             session["messages"] = [message.to_dict() for message in self.messages]
+            session["usage"] = summarize_usage(self.messages).to_dict()
         return session

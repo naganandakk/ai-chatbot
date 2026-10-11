@@ -166,3 +166,10 @@ def test_done_event_carries_token_usage_and_cost():
 
     done = parse_event(body, "done")
     assert done["message"]["usage"] == {"inputTokens": 12, "outputTokens": 5, "costUsd": 0.5}
+    assert done["session"]["usage"] == {
+        "inputTokens": 12,
+        "outputTokens": 5,
+        "costUsd": 0.5,
+        "pricedMessages": 1,
+        "unpricedMessages": 0,
+    }

@@ -1,4 +1,5 @@
 from backend.app import create_app
+from core.chat_core.store import InMemorySessionStore
 
 
 def test_create_and_list_sessions():
@@ -51,3 +52,22 @@ def test_get_missing_session_returns_not_found():
 
     assert response.status_code == 404
     assert response.get_json() == {"error": "Session not found"}
+
+def test_session_response_includes_usage_totals_but_list_does_not():
+    store = InMemorySessionStore()
+    session = store.create()
+    store.add_message(
+        session.id,
+        "assistant",
+        "Hi",
+        model="claude-sonnet-5-5",
+        usage='{"input_tokens": 12, "output_tokens": 5, "cost_usd": 0.5}',
+    )
+    client = create_app(store=store).test_client()
+
+    get_body = client.get(f"/api/sessions/{session.id}").get_json()
+    list_body = client.get("/api/sessions").get_json()
+
+    assert get_body["usage"]["costUsd"] == 0.5
+    assert get_body["usage"]["inputTokens"] == 12
+    assert "usage" not in list_body[0]

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { EllipsisVertical, Pause, Play, Volume2 } from 'lucide-react';
 import { speechPlayback, useSpeechPlayback } from '../speech';
 import type { Usage } from '../api';
+import { formatCost } from '../format';
 
 interface MoreOptionsBtnProps {
   model: string;
@@ -17,14 +18,6 @@ const toSpeechText = (markdown: string) => markdown
   .replace(/```[\s\S]*?```/g, ' ')
   .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
   .replace(/[*_#>`~]+/g, '');
-
-// Replies often cost fractions of a cent, so keep enough digits to show them
-const formatCost = (usd: number) => new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 6,
-}).format(usd);
 
 // The chat list scrolls inside its own container, so the menu must fit within that area, not just the window
 const getVisibleBounds = (element: HTMLElement) => {

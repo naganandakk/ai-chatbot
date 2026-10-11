@@ -10,6 +10,16 @@ export type Usage = {
   costUsd: number | null;
 };
 
+// Totals across a session's replies. costUsd is null when no reply has a known cost, and
+// unpricedMessages counts replies left out of the cost
+export type SessionUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number | null;
+  pricedMessages: number;
+  unpricedMessages: number;
+};
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -30,6 +40,7 @@ export type SessionSummary = {
 
 export type ChatSession = SessionSummary & {
   messages: Message[];
+  usage: SessionUsage;
 };
 
 export type ModelOption = {
@@ -62,7 +73,7 @@ async function request<T>(
 
 export type StreamDone = {
   message: Message;
-  session: SessionSummary;
+  session: SessionSummary & { usage: SessionUsage };
 };
 
 // Carries the server's copy of the session when the stream fails, so the UI can reconcile

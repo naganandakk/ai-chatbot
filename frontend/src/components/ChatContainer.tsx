@@ -1,5 +1,5 @@
 import {
-  ArrowDown, Sparkles, Code, Compass
+  ArrowDown, Sparkles
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -14,6 +14,7 @@ import MoreOptionsBtn from './MoreOptionsBtn';
 import PromptInput from './PromptInput';
 import PlaybackControl from './PlaybackControl';
 import { useIsDesktop } from '../useIsDesktop';
+import { pickSamplePrompts } from '../samplePrompts';
 
 // Markdown spacing: blocks get a shared vertical rhythm, and the wrapper trims the outer edges
 const markdownComponents: Components = {
@@ -135,6 +136,14 @@ const ChatContainer = () => {
   const [copyableIdx, setCopyableIdx] = useState<number | null>(null);
   const hideCopyable = useCallback(() => setCopyableIdx(null), []);
 
+  // New two-prompt picks each time the new chat screen is shown
+  const [samplePrompts, setSamplePrompts] = useState(pickSamplePrompts);
+  useEffect(() => {
+    if (!activeSession) {
+      setSamplePrompts(pickSamplePrompts());
+    }
+  }, [activeSession]);
+
   // Shows the scroll-to-bottom button only when the latest content is out of view
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -203,7 +212,7 @@ const ChatContainer = () => {
       </div>
       <h2 className="text-2xl md:text-3xl font-medium tracking-tight text-[#202124] dark:text-white mb-2">Hello, how can I help you today?</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg mt-6">
-        {[{ title: 'Explain React Server Components', icon: Code }, { title: 'Plan a 3-day trip to Tokyo', icon: Compass }].map((item, idx) => (
+        {samplePrompts.map((item, idx) => (
           <button key={idx} onClick={() => setInputMessage(item.title)} className="flex items-center gap-3 p-3 rounded-xl border border-[#dadce0] dark:border-[#3c4043] hover:bg-[#f8f9fa] dark:hover:bg-[#1e1f20] text-left text-xs md:text-sm text-[#3c4043] dark:text-[#c4c7c5]">
             <item.icon className="w-4 h-4 text-[#1a73e8]" />
             <span className="flex-1 truncate">{item.title}</span>

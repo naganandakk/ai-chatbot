@@ -92,16 +92,23 @@ const Sidebar = () => {
     setPendingConfirm({ action, sessionId });
   }
 
+  // On phones the sidebar covers the chat, so it closes once an action finishes
+  function closeSidebarOnMobile() {
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  }
+
   async function deleteSession(sessionId: string) {
     await deleteChat(sessionId);
     setMenuOpenId(null);
     setPendingConfirm(null);
+    closeSidebarOnMobile();
   }
 
   async function clearChatHistory(sessionId: string) {
     await clearChat(sessionId);
     setMenuOpenId(null);
     setPendingConfirm(null);
+    closeSidebarOnMobile();
   }
 
   function handleStartEdit (e: React.MouseEvent, chat: SessionSummary) {
@@ -218,10 +225,14 @@ const Sidebar = () => {
         {editingChat && (
           <RenameModal
             initialTitle={editingChat.title}
-            onCancel={() => setEditingChatId(null)}
-            onSave={(title) => {
+            onCancel={() => {
               setEditingChatId(null);
-              void renameChat(editingChat.id, title);
+              closeSidebarOnMobile();
+            }}
+            onSave={async (title) => {
+              setEditingChatId(null);
+              await renameChat(editingChat.id, title);
+              closeSidebarOnMobile();
             }}
           />
         )}
@@ -234,7 +245,10 @@ const Sidebar = () => {
                 <span className="font-medium text-[#3c4043] dark:text-[#c4c7c5]">&ldquo;{pendingConfirmSession.title}&rdquo;</span> will be permanently deleted. This can&apos;t be undone.
               </>}
               confirmLabel="Delete"
-              onCancel={() => setPendingConfirm(null)}
+              onCancel={() => {
+                setPendingConfirm(null);
+                closeSidebarOnMobile();
+              }}
               onConfirm={() => void deleteSession(pendingConfirm.sessionId)}
             />
           ) : (
@@ -244,7 +258,10 @@ const Sidebar = () => {
                 All messages in <span className="font-medium text-[#3c4043] dark:text-[#c4c7c5]">&ldquo;{pendingConfirmSession.title}&rdquo;</span> will be removed. The chat itself will be kept. This can&apos;t be undone.
               </>}
               confirmLabel="Clear"
-              onCancel={() => setPendingConfirm(null)}
+              onCancel={() => {
+                setPendingConfirm(null);
+                closeSidebarOnMobile();
+              }}
               onConfirm={() => void clearChatHistory(pendingConfirm.sessionId)}
             />
           )

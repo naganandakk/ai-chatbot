@@ -100,3 +100,22 @@ def test_truncated_flag_is_saved_with_assistant_message(store):
     assert assistant.truncated is True
     assert assistant.to_dict()["truncated"] is True
     assert store.get(session.id).messages[0].truncated is False
+
+
+def test_usage_is_saved_with_assistant_message(store):
+    session = store.create()
+    store.add_message(session.id, "user", "Hi")
+
+    store.add_message(session.id, "assistant", "Hello", "[]", "m-1", usage='{"input_tokens": 3}')
+
+    assistant = store.get(session.id).messages[1]
+    assert assistant.usage == '{"input_tokens": 3}'
+
+
+def test_duration_is_saved_with_assistant_message(store):
+    session = store.create()
+    store.add_message(session.id, "user", "Hi")
+
+    store.add_message(session.id, "assistant", "Hello", duration_ms=1234)
+
+    assert store.get(session.id).messages[1].duration_ms == 1234

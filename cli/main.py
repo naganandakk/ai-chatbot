@@ -3,6 +3,19 @@ from core.chat_core.service import ChatService
 from core.chat_core.store import InMemorySessionStore
 
 
+def print_summary(message: dict) -> None:
+    parts = []
+    usage = message["usage"]
+    if usage is not None:
+        cost = "cost unavailable" if usage["costUsd"] is None else f"${usage['costUsd']:.6f}"
+        parts.append(f"{usage['inputTokens']} input, {usage['outputTokens']} output, {cost}")
+    if message["durationMs"] is not None:
+        parts.append(f"{message['durationMs'] / 1000:.1f} s")
+
+    if parts:
+        print(f"[{', '.join(parts)}]")
+
+
 def main() -> None:
     store = InMemorySessionStore()
     service = ChatService(store)
@@ -43,6 +56,7 @@ def main() -> None:
                     continue
                 print(chunk, end="", flush=True)
             print()
+            print_summary(store.get(session.id).messages[-1].to_dict())
         except RuntimeError as error:
             print(f"\nConfiguration error: {error}")
         except ProviderError as error:

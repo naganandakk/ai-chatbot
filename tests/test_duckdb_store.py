@@ -110,7 +110,7 @@ def test_list_returns_summaries_without_messages():
         store.close()
 
 
-def test_adds_truncated_column_to_existing_database(tmp_path):
+def test_adds_new_message_columns_to_existing_database(tmp_path):
     import duckdb
 
     database_path = str(tmp_path / "old.duckdb")
@@ -136,8 +136,8 @@ def test_adds_truncated_column_to_existing_database(tmp_path):
     store = DuckDBSessionStore(database_path)
     try:
         messages = store.connection.execute(
-            "SELECT content, truncated FROM chat_messages"
+            "SELECT content, truncated, usage, duration_ms FROM chat_messages"
         ).fetchall()
-        assert messages == [("Old", False)]
+        assert messages == [("Old", False, None, None)]
     finally:
         store.close()

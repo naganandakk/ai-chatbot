@@ -258,6 +258,8 @@ const ChatContainer = () => {
                 content={msg.content}
                 playbackId={`${activeSession?.id}:${msg.createdAt}`}
                 truncated={msg.truncated}
+                usage={msg.usage}
+                durationMs={msg.durationMs}
               />
             )}
           </div>

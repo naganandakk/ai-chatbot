@@ -1,7 +1,9 @@
 import json
 import logging
 import threading
+import time
 from collections.abc import Generator
+from dataclasses import asdict
 
 from .models import ChatMessage
 from .providers import (
@@ -11,6 +13,7 @@ from .providers import (
     ReplyReset,
     ReplyTruncated,
     TextDelta,
+    Usage,
     create_provider,
 )
 from .settings import Settings
@@ -58,7 +61,9 @@ class ChatService:
         chunks: list[str] = []
         sources: list[dict] = []
         truncated = False
+        usage: Usage | None = None
 
+        started = time.perf_counter()
         for event in provider.stream(
             model=model,
             messages=conversation,
@@ -76,6 +81,11 @@ class ChatService:
                 yield event
             elif isinstance(event, ReplyTruncated):
                 truncated = True
+            elif isinstance(event, Usage):
+                # Kept across a ReplyReset, since tokens spent on narration were still billed
+                usage = event
+
+        duration_ms = round((time.perf_counter() - started) * 1000)
 
         return self.store.add_message(
             session_id,
@@ -84,6 +94,8 @@ class ChatService:
             json.dumps(sources),
             model,
             truncated,
+            json.dumps(asdict(usage)) if usage else "",
+            duration_ms,
         )
 
     def warm_up(self) -> None:

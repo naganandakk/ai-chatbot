@@ -134,3 +134,35 @@ def test_streaming_endpoint_passes_truncated_reply_message_to_client():
 
     assert "event: error" in body
     assert "The model used its token limit before writing a reply" in body
+
+
+def test_done_event_carries_token_usage_and_cost():
+    store = InMemorySessionStore()
+
+    class UsageChatService:
+        def stream_reply(self, session_id: str, prompt: str, model: str | None = None):
+            self.store.add_message(session_id, "user", prompt)
+            return self.store.add_message(
+                session_id,
+                "assistant",
+                "Hi",
+                "[]",
+                "claude-sonnet-5-5",
+                False,
+                '{"input_tokens": 12, "output_tokens": 5, "cost_usd": 0.5}',
+            )
+            yield
+
+    service = UsageChatService()
+    service.store = store
+    app = create_app(store=store, chat_service=service)
+    client = app.test_client()
+    session = client.post("/api/sessions").get_json()
+
+    body = client.post(
+        f"/api/sessions/{session['id']}/messages",
+        json={"message": "Hello"},
+    ).get_data(as_text=True)
+
+    done = parse_event(body, "done")
+    assert done["message"]["usage"] == {"inputTokens": 12, "outputTokens": 5, "costUsd": 0.5}

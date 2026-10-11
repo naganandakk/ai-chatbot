@@ -64,7 +64,7 @@ class DuckDBSessionStore(SessionStore):
 
         message_rows = self.connection.execute(
             """
-            SELECT role, content, sources, model, truncated, created_at
+            SELECT role, content, sources, model, truncated, usage, duration_ms, created_at
             FROM chat_messages
             WHERE session_id = ?
             ORDER BY created_at, id
@@ -80,8 +80,11 @@ class DuckDBSessionStore(SessionStore):
                 sources=sources or "",
                 model=model or "",
                 truncated=bool(truncated),
+                usage=usage or "",
+                duration_ms=duration_ms,
             )
-            for role, content, sources, model, truncated, created_at in message_rows
+            for role, content, sources, model, truncated, usage, duration_ms, created_at
+            in message_rows
         ]
 
         return ChatSession(
@@ -122,6 +125,8 @@ class DuckDBSessionStore(SessionStore):
         sources: str = "",
         model: str = "",
         truncated: bool = False,
+        usage: str = "",
+        duration_ms: int | None = None,
     ) -> ChatMessage:
         session = self._require(session_id)
         message = ChatMessage(
@@ -130,6 +135,8 @@ class DuckDBSessionStore(SessionStore):
             sources=sources,
             model=model,
             truncated=truncated,
+            usage=usage,
+            duration_ms=duration_ms,
         )
         title = session.title
 
@@ -139,8 +146,9 @@ class DuckDBSessionStore(SessionStore):
         self.connection.execute(
             """
             INSERT INTO chat_messages
-                (id, session_id, role, content, sources, model, truncated, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, session_id, role, content, sources, model, truncated, usage,
+                 duration_ms, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 str(uuid4()),
@@ -150,6 +158,8 @@ class DuckDBSessionStore(SessionStore):
                 message.sources,
                 message.model,
                 message.truncated,
+                message.usage,
+                message.duration_ms,
                 message.created_at,
             ],
         )
@@ -256,6 +266,12 @@ class DuckDBSessionStore(SessionStore):
         )
         self.connection.execute(
             "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS truncated BOOLEAN DEFAULT FALSE"
+        )
+        self.connection.execute(
+            "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS usage TEXT"
+        )
+        self.connection.execute(
+            "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS duration_ms INTEGER"
         )
         self.connection.execute(
             """

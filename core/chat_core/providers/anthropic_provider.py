@@ -12,7 +12,9 @@ from .base import (
     ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
+    Usage,
 )
+from .pricing import anthropic_cost
 
 
 class AnthropicProvider:
@@ -44,13 +46,24 @@ class AnthropicProvider:
 
         stop_reason = None
         wrote_text = False
+        input_tokens = cache_write_tokens = cache_read_tokens = 0
+        output_tokens = web_searches = 0
 
         try:
             response = self._client.messages.create(**params)
 
             for event in response:
+                if event.type == "message_start":
+                    usage = event.message.usage
+                    input_tokens = usage.input_tokens or 0
+                    cache_write_tokens = usage.cache_creation_input_tokens or 0
+                    cache_read_tokens = usage.cache_read_input_tokens or 0
                 if event.type == "message_delta":
                     stop_reason = event.delta.stop_reason
+                    # The output count in message_delta is a running total, so the last one wins
+                    output_tokens = event.usage.output_tokens or 0
+                    if event.usage.server_tool_use:
+                        web_searches = event.usage.server_tool_use.web_search_requests or 0
                 # Text written before a server tool call is the model narrating its search
                 if (
                     event.type == "content_block_start"
@@ -64,6 +77,20 @@ class AnthropicProvider:
                 if event.type == "content_block_delta" and event.delta.type == "text_delta":
                     wrote_text = True
                     yield TextDelta(event.delta.text)
+
+            # Cache reads and writes are input tokens too, so they count toward the total
+            yield Usage(
+                input_tokens=input_tokens + cache_write_tokens + cache_read_tokens,
+                output_tokens=output_tokens,
+                cost_usd=anthropic_cost(
+                    model,
+                    input_tokens=input_tokens,
+                    cache_write_tokens=cache_write_tokens,
+                    cache_read_tokens=cache_read_tokens,
+                    output_tokens=output_tokens,
+                    web_searches=web_searches,
+                ),
+            )
 
             if stop_reason == "max_tokens":
                 if not wrote_text:

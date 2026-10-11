@@ -15,6 +15,7 @@ from core.chat_core.providers import (
     ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
+    Usage,
 )
 from core.chat_core.service import ChatService
 from core.chat_core.settings import DEFAULT_MAX_TOKENS, Settings
@@ -597,6 +598,7 @@ class TruncatedMessages:
             SimpleNamespace(
                 type="message_delta",
                 delta=SimpleNamespace(stop_reason="max_tokens"),
+                usage=SimpleNamespace(output_tokens=8192, server_tool_use=None),
             ),
         ]
 
@@ -651,6 +653,7 @@ class TruncatedAfterTextMessages:
             SimpleNamespace(
                 type="message_delta",
                 delta=SimpleNamespace(stop_reason="max_tokens"),
+                usage=SimpleNamespace(output_tokens=8192, server_tool_use=None),
             ),
         ]
 
@@ -679,3 +682,131 @@ def test_provider_sends_configured_max_tokens():
     list(service.stream_reply(session.id, "Hello"))
 
     assert requests[0]["max_completion_tokens"] == 512
+
+
+def test_anthropic_reply_reports_tokens_and_cost():
+    class UsageMessages:
+        def create(self, **kwargs):
+            return [
+                SimpleNamespace(
+                    type="message_start",
+                    message=SimpleNamespace(usage=SimpleNamespace(
+                        input_tokens=1000,
+                        cache_creation_input_tokens=200,
+                        cache_read_input_tokens=300,
+                    )),
+                ),
+                SimpleNamespace(
+                    type="content_block_delta",
+                    delta=SimpleNamespace(type="text_delta", text="Hi"),
+                ),
+                SimpleNamespace(
+                    type="message_delta",
+                    delta=SimpleNamespace(stop_reason="end_turn"),
+                    usage=SimpleNamespace(
+                        output_tokens=50,
+                        server_tool_use=SimpleNamespace(web_search_requests=2),
+                    ),
+                ),
+            ]
+
+    store = InMemorySessionStore()
+    session = store.create()
+    service = anthropic_service(store, SimpleNamespace(messages=UsageMessages()))
+
+    list(service.stream_reply(session.id, "Hello", model="claude-sonnet-5-5"))
+
+    usage = store.get(session.id).to_dict()["messages"][1]["usage"]
+    # Sonnet 5.5: 1000 input at $2, 200 cache writes at $2.50, 300 cache reads at $0.10,
+    # 50 output at $10, plus 2 searches at $0.01
+    assert usage == {
+        "inputTokens": 1500,
+        "outputTokens": 50,
+        "costUsd": pytest.approx(0.02303),
+    }
+
+
+def test_anthropic_unknown_model_reports_tokens_without_cost():
+    store = InMemorySessionStore()
+    session = store.create()
+    provider = FakeProvider([Usage(input_tokens=12, output_tokens=3, cost_usd=None)])
+    service = ChatService(store, provider=provider, settings=anthropic_settings())
+
+    list(service.stream_reply(session.id, "Hello"))
+
+    usage = store.get(session.id).to_dict()["messages"][1]["usage"]
+    assert usage == {"inputTokens": 12, "outputTokens": 3, "costUsd": None}
+
+
+def test_openrouter_reply_reports_cost_from_final_chunk():
+    store = InMemorySessionStore()
+    session = store.create()
+    requests: list[dict] = []
+    final_chunk = {
+        "id": "gen-1",
+        "object": "chat.completion.chunk",
+        "created": 1,
+        "model": "anthropic/claude-haiku-4.5",
+        "choices": [],
+        "usage": {
+            "prompt_tokens": 12,
+            "completion_tokens": 5,
+            "total_tokens": 17,
+            "cost": 0.00042,
+        },
+    }
+    transport = openrouter_transport([openrouter_chunk("Hi"), final_chunk], requests)
+    service = openrouter_service(store, transport)
+
+    assert "".join(service.stream_reply(session.id, "Hello")) == "Hi"
+
+    usage = store.get(session.id).to_dict()["messages"][1]["usage"]
+    assert usage == {"inputTokens": 12, "outputTokens": 5, "costUsd": 0.00042}
+
+
+def test_usage_survives_a_reply_reset_because_the_tokens_were_billed():
+    store = InMemorySessionStore()
+    session = store.create()
+    provider = FakeProvider([
+        Usage(input_tokens=10, output_tokens=4, cost_usd=0.5),
+        TextDelta("Searching..."),
+        ReplyReset(),
+        TextDelta("Answer"),
+    ])
+    service = ChatService(store, provider=provider, settings=anthropic_settings())
+
+    list(service.stream_reply(session.id, "Hello"))
+
+    assistant = store.get(session.id).messages[1]
+    assert assistant.content == "Answer"
+    assert assistant.to_dict()["usage"] == {"inputTokens": 10, "outputTokens": 4, "costUsd": 0.5}
+
+
+def test_reply_without_usage_event_saves_no_usage():
+    store = InMemorySessionStore()
+    session = store.create()
+    service = ChatService(
+        store,
+        provider=FakeProvider([TextDelta("Hi")]),
+        settings=anthropic_settings(),
+    )
+
+    list(service.stream_reply(session.id, "Hello"))
+
+    assert store.get(session.id).messages[1].to_dict()["usage"] is None
+
+
+def test_reply_saves_time_taken_in_milliseconds():
+    store = InMemorySessionStore()
+    session = store.create()
+    service = ChatService(
+        store,
+        provider=FakeProvider([TextDelta("Hi")]),
+        settings=anthropic_settings(),
+    )
+
+    list(service.stream_reply(session.id, "Hello"))
+
+    duration_ms = store.get(session.id).to_dict()["messages"][1]["durationMs"]
+    assert isinstance(duration_ms, int)
+    assert duration_ms >= 0

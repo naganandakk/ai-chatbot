@@ -1,12 +1,15 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { EllipsisVertical, Pause, Play, Volume2 } from 'lucide-react';
 import { speechPlayback, useSpeechPlayback } from '../speech';
+import type { Usage } from '../api';
 
 interface MoreOptionsBtnProps {
   model: string;
   content: string;
   playbackId: string;
   truncated?: boolean;
+  usage?: Usage | null;
+  durationMs?: number | null;
 }
 
 // Removes markdown symbols so the speech engine does not read them out
@@ -14,6 +17,14 @@ const toSpeechText = (markdown: string) => markdown
   .replace(/```[\s\S]*?```/g, ' ')
   .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
   .replace(/[*_#>`~]+/g, '');
+
+// Replies often cost fractions of a cent, so keep enough digits to show them
+const formatCost = (usd: number) => new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 6,
+}).format(usd);
 
 // The chat list scrolls inside its own container, so the menu must fit within that area, not just the window
 const getVisibleBounds = (element: HTMLElement) => {
@@ -36,7 +47,7 @@ const getVisibleBounds = (element: HTMLElement) => {
   return bounds;
 };
 
-const MoreOptionsBtn = ({ model, content, playbackId, truncated }: MoreOptionsBtnProps) => {
+const MoreOptionsBtn = ({ model, content, playbackId, truncated, usage, durationMs }: MoreOptionsBtnProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isAbove, setIsAbove] = useState(false);
   const playback = useSpeechPlayback();
@@ -145,6 +156,16 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated }: MoreOptionsBt
           </ul>
           <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-200">
             Used <span className="font-medium text-gray-800 break-all">{model || 'Unknown'}</span> model
+            {durationMs != null && (
+              <div className="mt-1">Time taken: <span className="font-medium text-gray-800">{(durationMs / 1000).toFixed(1)} s</span></div>
+            )}
+            {usage && (
+              <div className="mt-1 space-y-0.5">
+                <div>Input tokens: <span className="font-medium text-gray-800">{usage.inputTokens.toLocaleString()}</span></div>
+                <div>Output tokens: <span className="font-medium text-gray-800">{usage.outputTokens.toLocaleString()}</span></div>
+                <div>Cost: <span className="font-medium text-gray-800">{usage.costUsd === null ? 'Unavailable' : formatCost(usage.costUsd)}</span></div>
+              </div>
+            )}
             {truncated && (
               <div className="mt-1 text-amber-700">Reply stopped at the length limit</div>
             )}

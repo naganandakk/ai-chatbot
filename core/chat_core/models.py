@@ -17,6 +17,10 @@ class ChatMessage:
     sources: str = ""
     model: str = ""
     truncated: bool = False
+    # JSON of the reply's token counts and cost, empty when the provider reported none
+    usage: str = ""
+    # Milliseconds from sending the request to the end of the reply, None for older messages
+    duration_ms: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -25,8 +29,22 @@ class ChatMessage:
             "sources": json.loads(self.sources.strip()) if self.sources.strip() else [],
             "model": self.model,
             "truncated": self.truncated,
+            "usage": _usage_to_dict(self.usage),
+            "durationMs": self.duration_ms,
             "createdAt": self.created_at,
         }
+
+
+def _usage_to_dict(raw: str) -> dict[str, Any] | None:
+    if not raw.strip():
+        return None
+
+    usage = json.loads(raw)
+    return {
+        "inputTokens": usage["input_tokens"],
+        "outputTokens": usage["output_tokens"],
+        "costUsd": usage["cost_usd"],
+    }
 
 
 @dataclass

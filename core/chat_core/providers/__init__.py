@@ -11,6 +11,7 @@ from .base import (
     ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
+    Usage,
 )
 from .openrouter_provider import OpenRouterProvider
 
@@ -53,6 +54,7 @@ __all__ = [
     "ReplyTruncated",
     "TextDelta",
     "TruncatedReplyError",
+    "Usage",
     "create_provider",
     "create_provider_by_name",
 ]

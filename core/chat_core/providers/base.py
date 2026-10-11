@@ -41,7 +41,16 @@ class ReplyReset:
     """Sent when the text so far was narration before a tool call. The reply starts over."""
 
 
-ProviderEvent = TextDelta | Citation | ReplyTruncated | ReplyReset
+@dataclass(frozen=True)
+class Usage:
+    """Sent once per reply, after the text. `cost_usd` is None when the cost is unknown."""
+
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float | None
+
+
+ProviderEvent = TextDelta | Citation | ReplyTruncated | ReplyReset | Usage
 
 
 @dataclass(frozen=True)

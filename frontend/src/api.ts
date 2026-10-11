@@ -3,6 +3,13 @@ export type Source = {
   url: string
 };
 
+// costUsd is null when the provider did not report a cost for the model
+export type Usage = {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number | null;
+};
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -10,6 +17,8 @@ export type Message = {
   sources: Source[];
   model: string;
   truncated?: boolean;
+  usage?: Usage | null;
+  durationMs?: number | null;
 };
 
 export type SessionSummary = {

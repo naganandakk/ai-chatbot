@@ -14,6 +14,7 @@ from .base import (
     ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
+    Usage,
 )
 from .openrouter_http import CitationHttpClient
 
@@ -103,6 +104,7 @@ class OpenRouterProvider:
         sources: list[dict] = []
         finish_reason = None
         wrote_text = False
+        usage = None
 
         try:
             with (
@@ -113,12 +115,25 @@ class OpenRouterProvider:
                     if chunk.error is not None:
                         raise ProviderStreamError(chunk.error.message)
 
+                    # Only the final chunk carries usage
+                    if chunk.usage is not None:
+                        usage = chunk.usage
+
                     for choice in chunk.choices:
                         if choice.finish_reason:
                             finish_reason = choice.finish_reason
                         if choice.delta.content:
                             wrote_text = True
                             yield TextDelta(choice.delta.content)
+
+            if usage is not None:
+                # The cost is missing from the response for some models, so it stays None then
+                cost = usage.cost if isinstance(usage.cost, (int, float)) else None
+                yield Usage(
+                    input_tokens=usage.prompt_tokens,
+                    output_tokens=usage.completion_tokens,
+                    cost_usd=cost,
+                )
 
             if finish_reason == "length":
                 if not wrote_text:

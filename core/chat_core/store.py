@@ -32,6 +32,8 @@ class SessionStore(ABC):
         sources: str = "",
         model: str = "",
         truncated: bool = False,
+        usage: str = "",
+        duration_ms: int | None = None,
     ) -> ChatMessage:
         ...
 
@@ -99,6 +101,8 @@ class InMemorySessionStore(SessionStore):
         sources: str = "",
         model: str = "",
         truncated: bool = False,
+        usage: str = "",
+        duration_ms: int | None = None,
     ) -> ChatMessage:
         session = self._require(session_id)
         message = ChatMessage(
@@ -107,6 +111,8 @@ class InMemorySessionStore(SessionStore):
             sources=sources,
             model=model,
             truncated=truncated,
+            usage=usage,
+            duration_ms=duration_ms,
         )
         session.messages.append(message)
 

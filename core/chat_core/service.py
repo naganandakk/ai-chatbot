@@ -8,6 +8,7 @@ from dataclasses import asdict
 from .models import ChatMessage
 from .providers import (
     Citation,
+    ModelInfo,
     ModelProvider,
     ProviderError,
     ReplyReset,
@@ -106,6 +107,14 @@ class ChatService:
             provider.list_models()
         except (RuntimeError, ProviderError) as error:
             logger.warning("Could not load the model list at startup: %s", error)
+
+    def list_models(self) -> list[ModelInfo]:
+        _, provider = self._resolve()
+        return provider.list_models()
+
+    def default_model(self) -> str:
+        settings, _ = self._resolve()
+        return settings.model
 
     def _resolve(self) -> tuple[Settings, ModelProvider]:
         # Settings and the provider are created on first use, so a missing API key

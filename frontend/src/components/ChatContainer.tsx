@@ -220,7 +220,7 @@ const ChatContainer = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg mt-6">
         {samplePrompts.map((item, idx) => (
           <button key={idx} onClick={() => setInputMessage(item.title)} className="flex items-center gap-3 p-3 rounded-xl border border-[#dadce0] dark:border-[#3c4043] hover:bg-[#f8f9fa] dark:hover:bg-[#1e1f20] text-left text-xs md:text-sm text-[#3c4043] dark:text-[#c4c7c5]">
-            <item.icon className="w-4 h-4 text-[#1a73e8]" />
+            <item.icon className="w-4 h-4 text-[#1a73e8] dark:text-[#8ab4f8]" />
             <span className="flex-1 truncate">{item.title}</span>
           </button>
         ))}
@@ -259,9 +259,9 @@ const ChatContainer = () => {
                   <Sparkles className="w-4 h-4 text-[#1a73e8] dark:text-[#8ab4f8] animate-pulse" />
                   <span>Generating</span>
                   <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-bounce" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] dark:bg-[#8ab4f8] animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] dark:bg-[#8ab4f8] animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a73e8] dark:bg-[#8ab4f8] animate-bounce" style={{ animationDelay: '300ms' }} />
                   </span>
                 </div>
               )}

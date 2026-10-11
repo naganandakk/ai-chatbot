@@ -56,7 +56,14 @@ The project is three layers sharing one core: a Flask API (`backend/`), a termin
 
 **Testing approach.** Tests inject fakes rather than hitting the network: `FakeProvider` (any object with `stream(...)` that yields events) is passed as `ChatService(provider=...)`. `AnthropicProvider(client=FakeClaudeClient())` covers the Anthropic SDK path, and `FakeChatService` is passed to `create_app(chat_service=...)`. Keep new tests in this style; there is no live-API test.
 
-**Frontend state.** A single React context (`frontend/src/Context.tsx`) holds the active session, session list, `isGenerating`, sidebar state, and a toast-style error stack. Components read it via `useContext(Context)`. The Vite dev server is the only proxy to Flask, so frontend code uses relative `/api` paths.
+**Frontend state.** A single React context (`frontend/src/Context.tsx`) holds the active session, session list, `isGenerating`, sidebar state, theme, and a toast-style error stack. Components read it via `useContext(Context)`. The Vite dev server is the only proxy to Flask, so frontend code uses relative `/api` paths.
+
+**Theming.** Light and dark mode are switched by the `dark` class on `<html>`, which Tailwind keys on (`darkMode: 'class'` in `tailwind.config.js`). `ContextProvider` owns `theme` (`light` | `dark`), saved in localStorage under `ai-chat.theme`; until the user picks one it follows `prefers-color-scheme`. The toggle lives in the sidebar footer. **Every new UI element must work in both themes:** pair each light colour class with a `dark:` variant in the same `className`, and do not add bare `bg-white`, `bg-gray-*`, `text-gray-*`, or `border-gray-*` without one. Use the palette the existing components already use:
+- Page `dark:bg-[#131314]`, sidebar `dark:bg-[#1e1f20]`, menus, popovers and modals `dark:bg-[#28292a]`, borders `dark:border-[#3c4043]`
+- Hover and button fills `dark:bg-[#303134]` / `dark:hover:bg-[#3c4043]`, menu row hover `dark:hover:bg-[#353638]`
+- Primary text `dark:text-[#e3e3e3]`, secondary text `dark:text-[#9aa0a6]`, accent `dark:text-[#8ab4f8]`, red actions `dark:text-red-400`
+
+Two exceptions are intentional: the copied rich-text HTML in `CopyResponseBtn` carries inline light styles so it pastes readably elsewhere, and the code block wrapper is always dark zinc. Check new UI in both themes before finishing.
 
 ## Known state
 

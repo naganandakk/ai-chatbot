@@ -207,13 +207,13 @@ const Sidebar = () => {
                 {!isEditing && (
                   <div className="relative" ref={isMenuOpen ? chatActionsRef : undefined}>
                     <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(isMenuOpen ? null : chat.id); }} className="p-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-black/10 transition-opacity">
-                      <MoreVertical className="w-4 h-4 text-[#5f6368]" />
+                      <MoreVertical className="w-4 h-4 text-[#5f6368] dark:text-[#c4c7c5]" />
                     </button>
                     {isMenuOpen && (
                       <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#28292a] border border-[#dadce0] dark:border-[#3c4043] rounded-lg shadow-lg py-1 z-50">
                         <button onClick={(e) => handleStartEdit(e, chat)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><Edit2 className="w-3.5 h-3.5" /> Rename</button>
                         <button onClick={(e) => openConfirm(e, 'clear', chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"><RotateCcw className="w-3.5 h-3.5" /> Clear History</button>
-                        <button onClick={(e) => openConfirm(e, 'delete', chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+                        <button onClick={(e) => openConfirm(e, 'delete', chat.id)} className="flex items-center gap-2.5 w-full px-4 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
                       </div>
                     )}
                   </div>

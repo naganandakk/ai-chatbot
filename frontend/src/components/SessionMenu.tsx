@@ -64,7 +64,7 @@ const SessionMenu = () => {
           <button type="button" onClick={() => chooseAction('clear')} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]">
             <RotateCcw className="w-4 h-4" /> Clear history
           </button>
-          <button type="button" onClick={() => chooseAction('delete')} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-[#353638]">
+          <button type="button" onClick={() => chooseAction('delete')} className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40">
             <Trash2 className="w-4 h-4" /> Delete
           </button>
         </div>

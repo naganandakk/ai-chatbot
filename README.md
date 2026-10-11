@@ -48,7 +48,8 @@ Per-message actions
 
 Appearance
 
-- The interface renders in light mode. Dark-mode styles exist in the components, but nothing applies Tailwind's `dark` class yet, so they are inactive
+- Light and dark themes. Toggle **Dark mode** in the sidebar footer (on phones the sidebar closes after the switch). The choice is saved in the browser; until one is chosen, the app follows the operating system's light or dark setting
+- Every part of the interface has both themes. When adding UI, give each light colour class a `dark:` counterpart (see the theming notes in `CLAUDE.md`)
 - The layout adapts to narrow and wide screens
 
 Listen depends on the browser having a speech synthesis voice. If none is available, playback has no sound.

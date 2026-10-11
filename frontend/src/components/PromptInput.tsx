@@ -5,7 +5,9 @@ import { useEffect, useRef } from 'react';
 import { api, ChatSession, Message, SessionSummary, StreamError } from "../api";
 import { useAppContext } from "../Context";
 import { useIsDesktop } from "../useIsDesktop";
+import { useVoiceInput } from "../voiceInput";
 import ModelPicker from "./ModelPicker";
+import VoiceInputBtn from "./VoiceInputBtn";
 
 const PromptInput = () => {
   const {
@@ -20,6 +22,11 @@ const PromptInput = () => {
   } = useAppContext();
   const inputRef = useRef<HTMLInputElement>(null);
   const isDesktop = useIsDesktop();
+  const voice = useVoiceInput({
+    currentText: inputMessage,
+    onChange: setInputMessage,
+    onError: notifyError,
+  });
 
   // Focus the prompt when no chat is open. Desktop only, so phones don't pop the keyboard on load
   useEffect(() => {
@@ -67,6 +74,8 @@ const PromptInput = () => {
     // Sending while a session loads could attach the message to the wrong chat
     if (!inputMessage.trim() || isGenerating || isLoadingSession) return;
 
+    // Dictation must not write into the prompt after it has been sent and cleared
+    voice.cancel();
     const userText = inputMessage.trim();
     setInputMessage('');
     setIsGenerating(true);
@@ -181,9 +190,23 @@ const PromptInput = () => {
   }
 
   return (
-    <form onSubmit={handleSendMessage} className="flex items-center gap-1 bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border border-transparent focus-within:border-[#dadce0]">
-      <input ref={inputRef} type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder={isLoadingSession ? "Loading chat..." : "Enter a prompt here..."} className="min-w-0 w-full flex-1 bg-transparent py-4 pl-6 pr-2 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
+    <form onSubmit={handleSendMessage} className={`flex items-center gap-1 bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border focus-within:border-[#dadce0] transition-colors ${voice.isListening ? 'border-[#d93025] ring-2 ring-[#d93025]/20' : 'border-transparent'}`}>
+      <input ref={inputRef} type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder={isLoadingSession ? "Loading chat..." : voice.isListening ? "Listening... speak your prompt" : "Enter a prompt here..."} className="min-w-0 w-full flex-1 bg-transparent py-4 pl-6 pr-2 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
       {isDesktop && <ModelPicker />}
+      <VoiceInputBtn
+        isListening={voice.isListening}
+        disabled={isGenerating || isLoadingSession}
+        onToggle={() => {
+          if (voice.isListening) {
+            voice.stop();
+          } else if (voice.unsupportedReason) {
+            notifyError(voice.unsupportedReason);
+          } else {
+            voice.start();
+            inputRef.current?.focus();
+          }
+        }}
+      />
       <button type="submit" disabled={!inputMessage.trim() || isGenerating || isLoadingSession} className={`shrink-0 mr-2 p-2 rounded-full ${inputMessage.trim() && !isGenerating && !isLoadingSession ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
         <Send className="w-4 h-4" />
       </button>

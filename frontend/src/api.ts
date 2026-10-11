@@ -61,6 +61,7 @@ async function streamMessage(
   sessionId: string,
   message: string,
   onDelta: (text: string) => void,
+  onReset: () => void,
   onDone: (result: StreamDone) => void,
 ): Promise<void> {
   const response = await fetch(`/api/sessions/${sessionId}/messages`, {
@@ -108,7 +109,9 @@ async function streamMessage(
         );
       }
 
-      if (event.startsWith("event: done")) {
+      if (event.startsWith("event: reset")) {
+        onReset();
+      } else if (event.startsWith("event: done")) {
         onDone(payload as StreamDone);
       } else if (payload.text) {
         onDelta(payload.text);

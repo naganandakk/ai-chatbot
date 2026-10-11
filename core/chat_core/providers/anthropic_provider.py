@@ -7,6 +7,7 @@ from .base import (
     Citation,
     ProviderError,
     ProviderEvent,
+    ReplyReset,
     ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
@@ -49,6 +50,14 @@ class AnthropicProvider:
             for event in response:
                 if event.type == "message_delta":
                     stop_reason = event.delta.stop_reason
+                # Text written before a server tool call is the model narrating its search
+                if (
+                    event.type == "content_block_start"
+                    and event.content_block.type == "server_tool_use"
+                    and wrote_text
+                ):
+                    wrote_text = False
+                    yield ReplyReset()
                 if event.type == "content_block_delta" and event.delta.type == "citations_delta":
                     yield Citation(title=event.delta.citation.title, url=event.delta.citation.url)
                 if event.type == "content_block_delta" and event.delta.type == "text_delta":

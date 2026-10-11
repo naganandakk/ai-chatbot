@@ -3,7 +3,7 @@ import json
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
-from core.chat_core.providers import TruncatedReplyError
+from core.chat_core.providers import ReplyReset, TruncatedReplyError
 from core.chat_core.service import ChatService
 from core.chat_core.store import InMemorySessionStore, SessionStore
 
@@ -94,8 +94,11 @@ def create_app(
                         reply = finished.value
                         break
 
-                    event = json.dumps({"text": chunk})
-                    yield f"event: delta\ndata: {event}\n\n"
+                    if isinstance(chunk, ReplyReset):
+                        yield "event: reset\ndata: {}\n\n"
+                    else:
+                        event = json.dumps({"text": chunk})
+                        yield f"event: delta\ndata: {event}\n\n"
 
                 session = session_store.get(session_id)
                 event = {

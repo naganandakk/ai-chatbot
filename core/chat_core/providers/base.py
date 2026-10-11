@@ -36,7 +36,12 @@ class ReplyTruncated:
     """Sent once, after the text, when the reply stopped at the token limit."""
 
 
-ProviderEvent = TextDelta | Citation | ReplyTruncated
+@dataclass(frozen=True)
+class ReplyReset:
+    """Sent when the text so far was narration before a tool call. The reply starts over."""
+
+
+ProviderEvent = TextDelta | Citation | ReplyTruncated | ReplyReset
 
 
 class ModelProvider(Protocol):

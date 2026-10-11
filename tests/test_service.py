@@ -10,6 +10,7 @@ from core.chat_core.providers import (
     Citation,
     OpenRouterProvider,
     ProviderStreamError,
+    ReplyReset,
     ReplyTruncated,
     TextDelta,
     TruncatedReplyError,
@@ -200,6 +201,65 @@ def test_anthropic_maps_enabled_tools_to_server_tools():
     assert client.messages.requests[0]["tools"] == [{"type": "web_search"}]
 
 
+class SearchingMessages:
+    def create(self, **kwargs):
+        return [
+            SimpleNamespace(
+                type="content_block_start",
+                content_block=SimpleNamespace(type="text"),
+            ),
+            SimpleNamespace(
+                type="content_block_delta",
+                delta=SimpleNamespace(type="text_delta", text="Let me search."),
+            ),
+            SimpleNamespace(
+                type="content_block_start",
+                content_block=SimpleNamespace(type="server_tool_use"),
+            ),
+            SimpleNamespace(
+                type="content_block_start",
+                content_block=SimpleNamespace(type="text"),
+            ),
+            SimpleNamespace(
+                type="content_block_delta",
+                delta=SimpleNamespace(type="text_delta", text="It is sunny."),
+            ),
+        ]
+
+
+def test_anthropic_narration_before_web_search_is_dropped_from_reply():
+    store = InMemorySessionStore()
+    session = store.create()
+    client = SimpleNamespace(messages=SearchingMessages())
+    service = anthropic_service(store, client, tools_enabled=["web_search"])
+
+    chunks = list(service.stream_reply(session.id, "Weather?"))
+
+    assistant = store.get(session.id).messages[1]
+    assert chunks == ["Let me search.", ReplyReset(), "It is sunny."]
+    assert assistant.content == "It is sunny."
+
+
+def test_stream_reply_reset_clears_text_and_sources_before_it():
+    store = InMemorySessionStore()
+    session = store.create()
+    provider = FakeProvider([
+        TextDelta("Searching..."),
+        Citation(title="Old", url="https://example.com/old"),
+        ReplyReset(),
+        TextDelta("Answer"),
+        Citation(title="New", url="https://example.com/new"),
+    ])
+    service = ChatService(store, provider=provider, settings=anthropic_settings())
+
+    chunks = list(service.stream_reply(session.id, "Hello"))
+
+    assistant = store.get(session.id).messages[1]
+    assert chunks == ["Searching...", ReplyReset(), "Answer"]
+    assert assistant.content == "Answer"
+    assert json.loads(assistant.sources) == [{"title": "New", "url": "https://example.com/new"}]
+
+
 def openrouter_sse(*payloads: dict) -> str:
     events = "".join(f"data: {json.dumps(payload)}\n\n" for payload in payloads)
     return events + "data: [DONE]\n\n"
@@ -278,6 +338,21 @@ def test_openrouter_stream_reply_uses_openrouter_sdk_and_saves_messages():
     assert requests[0]["reasoning"] == {"effort": "none"}
     assert requests[0]["messages"] == [{"role": "user", "content": "Say hello"}]
     assert "plugins" not in requests[0]
+
+
+def test_openrouter_web_search_tells_model_not_to_narrate_the_search():
+    store = InMemorySessionStore()
+    session = store.create()
+    requests: list[dict] = []
+    transport = openrouter_transport([openrouter_chunk("Sunny today.")], requests)
+    service = openrouter_service(store, transport, tools_enabled=["web_search"])
+
+    list(service.stream_reply(session.id, "Weather?"))
+
+    system_message = requests[0]["messages"][0]
+    assert system_message["role"] == "system"
+    assert "Do not say that you are going to search" in system_message["content"]
+    assert requests[0]["messages"][1] == {"role": "user", "content": "Weather?"}
 
 
 def test_openrouter_web_search_tool_enables_web_plugin():

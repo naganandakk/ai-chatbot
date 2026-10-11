@@ -16,6 +16,11 @@ from .base import (
 )
 from .openrouter_http import CitationHttpClient
 
+WEB_SEARCH_INSTRUCTION = (
+    "Web search is on. Do not say that you are going to search, look something up, or check "
+    "recent data. Start directly with the answer, using what you found."
+)
+
 
 class OpenRouterProvider:
     def __init__(
@@ -46,6 +51,9 @@ class OpenRouterProvider:
 
         if "web_search" in tools:
             params["plugins"] = [{"id": "web"}]
+            # The web plugin searches on the server and sends no event when it starts, so the
+            # provider cannot cut narration out of the stream. The instruction is the only control.
+            params["messages"] = [{"role": "system", "content": WEB_SEARCH_INSTRUCTION}, *messages]
 
         # The citation tap appends into this list while the SDK reads the stream. It is
         # bound to this thread only, so concurrent replies keep separate citations.

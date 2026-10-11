@@ -112,6 +112,23 @@ const PromptInput = () => {
             return { ...currentSession, messages };
           });
         },
+        () => {
+          // Text streamed before a web search was narration, so the reply starts over
+          setActiveSession((currentSession) => {
+            if (!currentSession || currentSession.id !== session.id) {
+              return currentSession;
+            }
+
+            const messages = [...currentSession.messages];
+            messages[messages.length - 1] = {
+              ...messages[messages.length - 1],
+              content: "",
+              sources: [],
+            };
+
+            return { ...currentSession, messages };
+          });
+        },
         ({ message, session: summary }) => {
           // The saved reply carries sources and the truncated flag, so it replaces the streamed placeholder
           setActiveSession((currentSession) => {

@@ -3,7 +3,14 @@ import threading
 from collections.abc import Generator
 
 from .models import ChatMessage
-from .providers import Citation, ModelProvider, ReplyTruncated, TextDelta, create_provider
+from .providers import (
+    Citation,
+    ModelProvider,
+    ReplyReset,
+    ReplyTruncated,
+    TextDelta,
+    create_provider,
+)
 from .settings import Settings
 from .store import SessionStore
 
@@ -24,8 +31,9 @@ class ChatService:
 
     def stream_reply(
         self, session_id: str, prompt: str, model: str | None = None
-    ) -> Generator[str, None, ChatMessage]:
-        # Yields text deltas and returns the saved assistant message once the reply ends.
+    ) -> Generator[str | ReplyReset, None, ChatMessage]:
+        # Yields text deltas, and a ReplyReset when earlier text is discarded. Returns the
+        # saved assistant message once the reply ends.
         message = prompt.strip()
         if not message:
             raise ValueError("Message cannot be empty")
@@ -57,6 +65,11 @@ class ChatService:
                 yield event.text
             elif isinstance(event, Citation):
                 sources.append({"title": event.title, "url": event.url})
+            elif isinstance(event, ReplyReset):
+                # The text and sources so far were narration before a web search
+                chunks.clear()
+                sources.clear()
+                yield event
             elif isinstance(event, ReplyTruncated):
                 truncated = True
 

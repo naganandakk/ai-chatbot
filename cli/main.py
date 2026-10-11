@@ -1,4 +1,4 @@
-from core.chat_core.providers import ProviderError
+from core.chat_core.providers import ProviderError, ReplyReset
 from core.chat_core.service import ChatService
 from core.chat_core.store import InMemorySessionStore
 
@@ -38,6 +38,9 @@ def main() -> None:
 
         try:
             for chunk in service.stream_reply(session.id, prompt):
+                # The CLI sends no tools, so it never gets a reset; text already printed can't be taken back
+                if isinstance(chunk, ReplyReset):
+                    continue
                 print(chunk, end="", flush=True)
             print()
         except RuntimeError as error:

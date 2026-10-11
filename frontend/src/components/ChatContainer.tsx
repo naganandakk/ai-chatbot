@@ -15,6 +15,10 @@ import PromptInput from './PromptInput';
 import PlaybackControl from './PlaybackControl';
 import { useIsDesktop } from '../useIsDesktop';
 import { pickSamplePrompts } from '../samplePrompts';
+import { formatCostShort } from '../format';
+
+// Each turn resends the whole chat, so past this much input per reply a new chat costs less
+const LONG_CHAT_INPUT_TOKENS = 50_000;
 
 // Markdown spacing: blocks get a shared vertical rhythm, and the wrapper trims the outer edges
 const markdownComponents: Components = {
@@ -130,7 +134,9 @@ const ChatContainer = () => {
     activeSession,
     isLoadingSession,
     isGenerating,
-    setInputMessage
+    setInputMessage,
+    setActiveSession,
+    requestPromptFocus,
   } = useAppContext();
   // Index of the user message whose copy button is revealed by a click
   const [copyableIdx, setCopyableIdx] = useState<number | null>(null);
@@ -221,6 +227,12 @@ const ChatContainer = () => {
       </div>
     </div>
   );
+  // The latest reply's input is the chat history the next reply will resend
+  const lastReplyUsage = [...(activeSession?.messages ?? [])].reverse().find(msg => msg.role === 'assistant' && msg.usage)?.usage;
+  const longChatInputTokens = lastReplyUsage && lastReplyUsage.inputTokens > LONG_CHAT_INPUT_TOKENS
+    ? lastReplyUsage.inputTokens
+    : null;
+
   const messageList = (
     <>
       {activeSession?.messages.map((msg: Message, idx: number) => (
@@ -261,6 +273,14 @@ const ChatContainer = () => {
               <CopyResponseBtn targetId={`response-${idx}`} />
             )}
             <SourcesBtn sources={msg.sources} id={idx} />
+            {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && msg.usage?.costUsd != null && (
+              <span
+                title={`${msg.usage.inputTokens.toLocaleString()} input + ${msg.usage.outputTokens.toLocaleString()} output tokens`}
+                className="text-xs text-[#5f6368] dark:text-[#9aa0a6] tabular-nums"
+              >
+                {formatCostShort(msg.usage.costUsd)}
+              </span>
+            )}
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
               <MoreOptionsBtn
                 model={msg.model}
@@ -275,6 +295,22 @@ const ChatContainer = () => {
         </div>
       ))
     }
+    {longChatInputTokens !== null && !isGenerating && (
+      <div role="note" className="flex flex-wrap items-center justify-center gap-2 text-xs text-amber-700 dark:text-amber-400 text-center">
+        <span>This chat is long, so each reply costs more ({longChatInputTokens.toLocaleString()} input tokens).</span>
+        {/* Same as the sidebar's New Chat: the session is created when the next prompt is sent */}
+        <button
+          type="button"
+          onClick={() => {
+            setActiveSession(null);
+            requestPromptFocus();
+          }}
+          className="rounded-full border border-amber-300 dark:border-amber-700 px-3 py-1 font-medium hover:bg-amber-50 dark:hover:bg-amber-950 transition-all"
+        >
+          Start new chat
+        </button>
+      </div>
+    )}
   </>
   );
   const sessionLoader = (

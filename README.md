@@ -64,7 +64,7 @@ tests/       Python unit and API tests
 data/        Local DuckDB database directory, created at runtime
 ```
 
-The web application stores sessions in DuckDB. The default database path is `data/chat.duckdb`, so sessions survive backend restarts on the same machine.
+The web application stores sessions in DuckDB by default. The default database path is `data/chat.duckdb`, so sessions survive backend restarts on the same machine. Set `CHAT_STORE=postgres` and `DATABASE_URL` to use PostgreSQL instead (see [Production deployment](#production-deployment)).
 
 ## Requirements
 
@@ -136,6 +136,8 @@ DuckDB holds a write lock on its database file. Flask's debug reloader starts a 
 uv run python -m cli.main
 ```
 
+The terminal client keeps its sessions in memory and ignores `CHAT_STORE`, `CHAT_DATABASE_PATH`, and `DATABASE_URL`. Its chats are not saved to DuckDB or Postgres and disappear when the process exits. Use the web app when you need persistent sessions.
+
 Available commands:
 
 ```text
@@ -171,7 +173,14 @@ npm run build
 
 Deploy `frontend/dist/` to a static host, CDN, or reverse proxy. Configure it to serve the frontend and route `/api` requests to the Flask service.
 
-Set `AI_PROVIDER`, the provider-specific API key, `CLAUDE_MODEL`, `CHAT_DATABASE_PATH`, and optionally `TOOLS_ENABLED` through your hosting platform's secret manager. Do not upload a `.env` file to production. Store the DuckDB file on persistent storage; ephemeral filesystem storage will erase sessions when the deployment restarts.
+Set `AI_PROVIDER`, the provider-specific API key, `CLAUDE_MODEL`, the storage variables below, and optionally `TOOLS_ENABLED` through your hosting platform's secret manager. Do not upload a `.env` file to production.
+
+Choose the session store with `CHAT_STORE`:
+
+- `CHAT_STORE=postgres` with `DATABASE_URL=postgresql://user:password@host:5432/dbname` for production. Sessions live in the database server, so the application can run with several workers or threads.
+- `CHAT_STORE=duckdb` (the default) with `CHAT_DATABASE_PATH` for local development. Store the DuckDB file on persistent storage; ephemeral filesystem storage will erase sessions when the deployment restarts.
+
+The Postgres tables are created on first start. To run the store contract tests against a Postgres database, set `TEST_DATABASE_URL` to a disposable database. The tests empty its tables before each check.
 
 Run the Flask application with Gunicorn:
 
@@ -182,7 +191,7 @@ uv run gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:5000 backend.app.wsgi:a
 
 Keep these settings in mind:
 
-- `--workers 1` is required. `backend.app.wsgi` opens the DuckDB file when it is imported, and DuckDB takes a write lock, so a second worker cannot open the same file.
+- With `CHAT_STORE=duckdb`, `--workers 1` is required. `backend.app.wsgi` opens the DuckDB file when it is imported, and DuckDB takes a write lock, so a second worker cannot open the same file. With `CHAT_STORE=postgres`, each worker opens its own connection pool, so more workers are safe.
 - The default worker class is `sync`, which serves one request at a time. A streaming reply holds the worker until it finishes, so other requests wait. The store serializes its DuckDB calls with a lock, so threads are safe to use. Raising `--threads` also needs `--worker-class gthread`, because the `sync` worker ignores it.
 - `--timeout 120` replaces Gunicorn's default of 30 seconds. A sync worker does not report progress while handling a request, so a slow model reply could otherwise get the worker killed. Set this to the longest reply you expect.
 

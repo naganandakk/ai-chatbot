@@ -8,13 +8,23 @@ Python (managed with `uv`, run from repo root):
 
 ```bash
 uv sync --all-groups                 # install deps incl. dev (pytest, ruff)
-uv run pytest                        # full test suite (17 tests, ~1s, no network)
+uv run pytest                        # full test suite (~1s, no network; Postgres contract tests skipped)
+TEST_DATABASE_URL=postgresql:///chat_store_test uv run pytest   # also run Postgres store contract tests
 uv run pytest tests/test_service.py::test_stream_reply_saves_user_and_assistant_messages  # single test
 uv run ruff check .                  # lint (line-length 100, py311)
 uv run flask --app backend.app.wsgi:app run --debug --no-reload --port 5000   # API
 uv run gunicorn --workers 1 --timeout 120 --bind 127.0.0.1:5000 backend.app.wsgi:app   # production-style server
 uv run python -m cli.main            # terminal client
 ```
+
+Postgres for the Postgres store and its contract tests. Locally, use any server that accepts connections (e.g. Homebrew `postgresql@17`, or Docker `postgres:17`). Create a disposable database and point `TEST_DATABASE_URL` at it; the tests `TRUNCATE` its tables before each check, so never reuse a database with data you keep:
+
+```bash
+createdb chat_store_test             # or: psql -c 'CREATE DATABASE chat_store_test'
+TEST_DATABASE_URL=postgresql:///chat_store_test uv run pytest tests/test_store_contract.py
+```
+
+To run the app against Postgres locally, set `CHAT_STORE=postgres` and `DATABASE_URL=postgresql:///chat_dev` in `.env` (create that database first). Tables are created on first start.
 
 Frontend (from `frontend/`):
 
@@ -24,7 +34,7 @@ npm run dev                          # Vite dev server on :5173, proxies /api ->
 npm run build                        # runs tsc -b then vite build; passes
 ```
 
-Always use `--no-reload` with Flask: DuckDB takes a write lock on the database file and the reloader's second process will fail to open it.
+Always use `--no-reload` with Flask when `CHAT_STORE=duckdb`: DuckDB takes a write lock on the database file and the reloader's second process will fail to open it. The Postgres store has no such lock.
 
 ## Architecture
 
@@ -40,7 +50,7 @@ The project is three layers sharing one core: a Flask API (`backend/`), a termin
 
 **Providers.** `ModelProvider` (`core/chat_core/providers/base.py`) is a protocol: `stream(model=, messages=, tools=)` yields `TextDelta` and `Citation` events, and failures are raised as `ProviderError`. Implementations live beside it: `AnthropicProvider` (Anthropic SDK; maps `TOOLS_ENABLED` names to server tools) and `OpenRouterProvider` (OpenRouter SDK; `web_search` maps to the `web` plugin). Each provider wraps its own SDK errors, so the service and CLI never import SDK exceptions. `create_provider(settings)` in `providers/__init__.py` picks the class from `PROVIDERS` by `AI_PROVIDER`; add a new provider by writing a class and registering it there. Keep the SDKs separate: do not route OpenRouter through the Anthropic SDK. The OpenRouter SDK's models drop `url_citation` annotations from streamed deltas, so `providers/openrouter_http.py` wraps the cached httpx client and reads the raw SSE lines. `OpenRouterProvider.stream` binds its per-reply sources list to the calling thread with `CitationHttpClient.collecting(sources)`, and emits the collected citations once the stream ends. Binding is per thread, so concurrent replies on threaded workers each keep their own citations. Do not share the sources list across threads or move the `collecting` block outside the request's send/stream. `OpenRouterProvider(transport=...)` takes an `httpx` transport so tests can run the real SDK against `httpx.MockTransport`.
 
-**Storage is an ABC.** `SessionStore` (`store.py`) declares the contract: create, get, list (summaries, newest first), add_message, clear, delete, update, and close. `InMemorySessionStore` (`store.py`) is the default for `create_app()` and for the CLI. `DuckDBSessionStore` (`duckdb_store.py`) is used by `backend/app/wsgi.py` and persists to `CHAT_DATABASE_PATH` (default `data/chat.duckdb`). A new store subclasses `SessionStore` and must pass `tests/test_store_contract.py`, which runs the same checks against every implementation. Unknown session IDs raise `KeyError`, and the Flask routes map that to 404. Title derivation (first 48 characters of the first user message, newlines flattened) lives in the base class.
+**Storage is an ABC.** `SessionStore` (`store.py`) declares the contract: create, get, list (summaries, newest first), add_message, clear, delete, update, and close. `InMemorySessionStore` (`store.py`) is the default for `create_app()` and for the CLI: `cli/main.py:main()` builds an in-memory store when no service is passed, so CLI chats are not persisted and ignore `CHAT_STORE`. Only the web app goes through `create_store()`. In production and local runs, `backend/app/wsgi.py` calls `create_store()` (`stores.py`), which picks the store from `CHAT_STORE`: `duckdb` (default; `DuckDBSessionStore` in `duckdb_store.py`, persisting to `CHAT_DATABASE_PATH`, default `data/chat.duckdb`) or `postgres` (`PostgresSessionStore` in `postgres_store.py`, a `psycopg` connection pool reading `DATABASE_URL`). Use Postgres for production; DuckDB is for local development and single-process use. A new store subclasses `SessionStore`, is selected in `create_store()`, and must pass `tests/test_store_contract.py`, which runs the same checks against every implementation (Postgres only when `TEST_DATABASE_URL` is set). Unknown session IDs raise `KeyError`, and the Flask routes map that to 404. Title derivation (first 48 characters of the first user message, newlines flattened) lives in the base class.
 
 **Configuration loading.** `.env` is loaded from the repo root by `settings.py` and again by `wsgi.py`. `Settings.from_env()` is called lazily inside `ChatService`, so missing config raises at first message, not at import. The CLI catches `RuntimeError` as a configuration error.
 
@@ -52,6 +62,6 @@ The project is three layers sharing one core: a Flask API (`backend/`), a termin
 
 - `npm run build` passes: `tsc -b` reports no type errors and the Vite bundle builds.
 - `uv run ruff check .` passes. The CLI catches `ProviderError` (raised by any provider, including when an OpenRouter stream chunk carries an `error`) for request failures, so other exceptions propagate instead of being printed.
-- `uv run pytest` passes (17 tests).
-- Production runs Gunicorn with `--workers 1 --timeout 120` (see README "Production deployment"). Workers must stay at 1: DuckDB takes a write lock, and each worker opens the file at import. The default `sync` worker serves one request at a time, so a streaming reply blocks other requests. Threads can go above 1 safely now: `DuckDBSessionStore` serializes every public method with a lock around its shared connection. Raising threads still needs `--worker-class gthread`, since the `sync` worker ignores `--threads`.
+- `uv run pytest` passes: 109 passed, 14 skipped without `TEST_DATABASE_URL`; 123 passed with it set to a Postgres database.
+- Gunicorn worker limits depend on the store. With `CHAT_STORE=duckdb`, workers must stay at 1: DuckDB takes a write lock, and each worker opens the file at import. Threads are safe there because `DuckDBSessionStore` serializes its public methods with a lock. With `CHAT_STORE=postgres`, each worker has its own connection pool, so more workers or threads are safe. Raising threads needs `--worker-class gthread`, since the `sync` worker ignores `--threads`. The production command in README still uses `--workers 1` as the baseline; raise it only after Postgres is in production.
 - The default Gunicorn timeout (30s) is too short for slow model replies, which is why the command sets `--timeout 120`.

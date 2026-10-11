@@ -1,13 +1,39 @@
+import os
+
+import psycopg
 import pytest
 
 from core.chat_core.duckdb_store import DuckDBSessionStore
+from core.chat_core.postgres_store import PostgresSessionStore
 from core.chat_core.store import InMemorySessionStore, SessionStore
 
+# Point this at a disposable database to run the Postgres contract checks. Its tables are
+# emptied before each test, so never use a database holding data you want to keep.
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "")
 
-@pytest.fixture(params=["memory", "duckdb"])
+
+@pytest.fixture(
+    params=[
+        "memory",
+        "duckdb",
+        pytest.param(
+            "postgres",
+            marks=pytest.mark.skipif(not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set"),
+        ),
+    ]
+)
 def store(request):
     if request.param == "memory":
         yield InMemorySessionStore()
+        return
+
+    if request.param == "postgres":
+        store = PostgresSessionStore(TEST_DATABASE_URL)
+        with psycopg.connect(TEST_DATABASE_URL, autocommit=True) as connection:
+            connection.execute("TRUNCATE chat_messages, chat_sessions")
+
+        yield store
+        store.close()
         return
 
     store = DuckDBSessionStore(":memory:")

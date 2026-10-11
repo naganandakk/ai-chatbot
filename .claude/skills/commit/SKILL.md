@@ -1,5 +1,5 @@
 ---
-name: commit-message
+name: commit
 description: Write a commit message for this repo's changes, mapping each changed folder (backend, core, cli, frontend, tests, docs, config, deps) to its area, then commit the staged changes. Use when the user asks for a commit message or to commit.
 ---
 

@@ -227,11 +227,10 @@ const ChatContainer = () => {
       </div>
     </div>
   );
-  // The latest reply's input is the chat history the next reply will resend
+  // The next reply resends the history plus the latest reply, so its input and output are the context size
   const lastReplyUsage = [...(activeSession?.messages ?? [])].reverse().find(msg => msg.role === 'assistant' && msg.usage)?.usage;
-  const longChatInputTokens = lastReplyUsage && lastReplyUsage.inputTokens > LONG_CHAT_INPUT_TOKENS
-    ? lastReplyUsage.inputTokens
-    : null;
+  const contextTokens = lastReplyUsage ? lastReplyUsage.inputTokens + lastReplyUsage.outputTokens : 0;
+  const longChatTokens = contextTokens > LONG_CHAT_INPUT_TOKENS ? contextTokens : null;
 
   const messageList = (
     <>
@@ -295,9 +294,9 @@ const ChatContainer = () => {
         </div>
       ))
     }
-    {longChatInputTokens !== null && !isGenerating && (
+    {longChatTokens !== null && !isGenerating && (
       <div role="note" className="flex flex-wrap items-center justify-center gap-2 text-xs text-amber-700 dark:text-amber-400 text-center">
-        <span>This chat is long, so each reply costs more ({longChatInputTokens.toLocaleString()} input tokens).</span>
+        <span>This chat is long, so each reply costs more (about {longChatTokens.toLocaleString()} tokens of context).</span>
         {/* Same as the sidebar's New Chat: the session is created when the next prompt is sent */}
         <button
           type="button"

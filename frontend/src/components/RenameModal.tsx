@@ -51,7 +51,7 @@ const RenameModal = ({ initialTitle, onCancel, onSave }: RenameModalProps) => {
           autoFocus
           value={title}
           onChange={e => setTitle(e.target.value)}
-          className="mt-4 w-full bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-3 py-2 rounded-lg text-sm border border-[#1a73e8] focus:outline-none"
+          className="mt-4 w-full bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-3 py-2 rounded-lg text-base md:text-sm border border-[#1a73e8] focus:outline-none"
         />
 
         <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">

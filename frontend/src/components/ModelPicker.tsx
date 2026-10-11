@@ -37,9 +37,11 @@ function groupByVendor(models: ModelOption[], provider: string): [string, ModelO
 }
 
 // OpenRouter names read "Anthropic: Claude Haiku 4.5". The group label already says Anthropic
+// "~" ids are OpenRouter's latest aliases. Their names end in "Latest", shown as "(latest)"
 function displayName(model: ModelOption, vendor: string): string {
   const prefix = `${vendor}: `;
-  return model.name.startsWith(prefix) ? model.name.slice(prefix.length) : model.name;
+  const name = model.name.startsWith(prefix) ? model.name.slice(prefix.length) : model.name;
+  return model.id.startsWith("~") ? `${name.replace(/ Latest$/, "")} (latest)` : name;
 }
 
 const ModelPicker = () => {

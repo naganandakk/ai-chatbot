@@ -18,6 +18,7 @@ if tools_enabled_str:
 
 store=DuckDBSessionStore(database_path)
 chat_service = ChatService(store=store, tools_enabled=tools_enabled)
+chat_service.warm_up()
 
 app = create_app(
     store=store,

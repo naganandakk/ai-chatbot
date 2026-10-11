@@ -9,6 +9,7 @@ from core.chat_core.providers import (
     AnthropicProvider,
     Citation,
     OpenRouterProvider,
+    ProviderError,
     ProviderStreamError,
     ReplyReset,
     ReplyTruncated,
@@ -367,6 +368,58 @@ def test_openrouter_retries_with_low_reasoning_when_model_requires_it():
 
     # The first reply tries "none", then "low". The second goes straight to "low".
     assert efforts == ["none", "low", "low"]
+
+
+def test_openrouter_sends_low_reasoning_first_for_known_mandatory_models():
+    store = InMemorySessionStore()
+    session = store.create()
+    requests: list[dict] = []
+    transport = openrouter_transport([openrouter_chunk("Hi")], requests)
+    service = openrouter_service(store, transport)
+
+    assert "".join(service.stream_reply(session.id, "Hello", model="~anthropic/claude-sonnet-latest")) == "Hi"
+
+    assert [request["reasoning"] for request in requests] == [{"effort": "low"}]
+
+
+def test_openrouter_uses_mandatory_reasoning_from_model_list_on_first_request():
+    listing_provider = OpenRouterProvider(api_key="openrouter-key")
+    mandatory_model = SimpleNamespace(
+        id="test/mandatory-reasoning-model",
+        name="Test: Mandatory Reasoning",
+        reasoning=SimpleNamespace(mandatory=True, supported_efforts=["high", "medium"]),
+    )
+    listing_provider._client = SimpleNamespace(models=SimpleNamespace(
+        list_for_user=lambda *, security: SimpleNamespace(
+            result=SimpleNamespace(data=[mandatory_model]),
+        ),
+    ))
+    listing_provider.list_models()
+
+    requests: list[dict] = []
+    provider = OpenRouterProvider(
+        api_key="openrouter-key",
+        transport=openrouter_transport([openrouter_chunk("Hi")], requests),
+    )
+    events = provider.stream(
+        model="test/mandatory-reasoning-model",
+        messages=[{"role": "user", "content": "Hello"}],
+        tools=[],
+    )
+
+    assert "".join(event.text for event in events if isinstance(event, TextDelta)) == "Hi"
+    # The lowest supported effort is sent first, so "none" is never tried
+    assert [request["reasoning"] for request in requests] == [{"effort": "medium"}]
+
+
+def test_warm_up_logs_and_keeps_starting_when_model_list_fails():
+    class FailingProvider:
+        def list_models(self):
+            raise ProviderError("upstream down")
+
+    service = ChatService(InMemorySessionStore(), provider=FailingProvider(), settings=openrouter_settings())
+
+    service.warm_up()
 
 
 def test_openrouter_web_search_tells_model_not_to_narrate_the_search():

@@ -25,6 +25,7 @@ def test_anthropic_list_models_returns_id_and_display_name():
 def test_openrouter_list_models_maps_sdk_models_to_id_and_name():
     sdk_models = [
         SimpleNamespace(id="anthropic/claude-haiku-4.5", name="Anthropic: Claude Haiku 4.5"),
+        SimpleNamespace(id="anthropic/claude-haiku-4.5:batch", name="Anthropic: Claude Haiku 4.5 (batch)"),
     ]
     provider = OpenRouterProvider(api_key="test-key")
     calls = []

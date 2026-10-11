@@ -1,4 +1,5 @@
 import json
+import logging
 import threading
 from collections.abc import Generator
 
@@ -6,6 +7,7 @@ from .models import ChatMessage
 from .providers import (
     Citation,
     ModelProvider,
+    ProviderError,
     ReplyReset,
     ReplyTruncated,
     TextDelta,
@@ -13,6 +15,8 @@ from .providers import (
 )
 from .settings import Settings
 from .store import SessionStore
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -81,6 +85,15 @@ class ChatService:
             model,
             truncated,
         )
+
+    def warm_up(self) -> None:
+        # Fetches the model list once so reasoning requirements are known before the first
+        # message. A failure is logged and the server still starts.
+        try:
+            _, provider = self._resolve()
+            provider.list_models()
+        except (RuntimeError, ProviderError) as error:
+            logger.warning("Could not load the model list at startup: %s", error)
 
     def _resolve(self) -> tuple[Settings, ModelProvider]:
         # Settings and the provider are created on first use, so a missing API key

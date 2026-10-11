@@ -24,8 +24,24 @@ WEB_SEARCH_INSTRUCTION = (
 # Reasoning tokens count against max_completion_tokens, so replies turn it off by default.
 # Some models always reason and reject "none", so they fall back to the lowest effort.
 REASONING_OFF = {"effort": "none"}
-REASONING_MINIMUM = {"effort": "low"}
 REASONING_MANDATORY_ERROR = "Reasoning is mandatory"
+# Fallback for models whose requirement is not in the model list yet. Matched by substring so
+# "~anthropic/claude-sonnet-latest" also matches.
+REASONING_MANDATORY_MODELS = ("claude-sonnet",)
+# Lowest effort for each model that rejects "none", from the model list's reasoning metadata.
+# Shared by every provider instance, since the requirement belongs to the model, not the key.
+_MANDATORY_REASONING_EFFORTS: dict[str, str] = {}
+
+
+def _record_reasoning_requirement(model) -> None:
+    reasoning = getattr(model, "reasoning", None)
+    if reasoning is None or not reasoning.mandatory:
+        _MANDATORY_REASONING_EFFORTS.pop(model.id, None)
+        return
+
+    # supported_efforts is highest first, so the last entry is the lowest allowed effort
+    efforts = reasoning.supported_efforts or []
+    _MANDATORY_REASONING_EFFORTS[model.id] = efforts[-1] if efforts and efforts[-1] else "low"
 
 
 class OpenRouterProvider:
@@ -42,9 +58,17 @@ class OpenRouterProvider:
         # Models that rejected effort "none". Remembered so later replies skip that request.
         self._reasoning_required: set[str] = set()
 
+    def _requires_reasoning(self, model: str) -> bool:
+        return (
+            model in self._reasoning_required
+            or model in _MANDATORY_REASONING_EFFORTS
+            or any(marker in model for marker in REASONING_MANDATORY_MODELS)
+        )
+
     def _send(self, model: str, params: dict):
-        if model in self._reasoning_required:
-            return self._client.chat.send(stream=True, reasoning=REASONING_MINIMUM, **params)
+        minimum = {"effort": _MANDATORY_REASONING_EFFORTS.get(model, "low")}
+        if self._requires_reasoning(model):
+            return self._client.chat.send(stream=True, reasoning=minimum, **params)
 
         try:
             return self._client.chat.send(stream=True, reasoning=REASONING_OFF, **params)
@@ -53,7 +77,7 @@ class OpenRouterProvider:
                 raise
 
             self._reasoning_required.add(model)
-            return self._client.chat.send(stream=True, reasoning=REASONING_MINIMUM, **params)
+            return self._client.chat.send(stream=True, reasoning=minimum, **params)
 
     def stream(
         self,
@@ -119,4 +143,13 @@ class OpenRouterProvider:
         if response is None:
             return []
 
-        return [ModelInfo(id=model.id, name=model.name) for model in response.result.data]
+        models = response.result.data
+        for model in models:
+            _record_reasoning_requirement(model)
+
+        # Batch variants ("<model>:batch") are for the batch API, not streamed chat replies
+        return [
+            ModelInfo(id=model.id, name=model.name)
+            for model in models
+            if not model.id.endswith(":batch")
+        ]

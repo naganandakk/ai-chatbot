@@ -121,7 +121,7 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated, usage, duration
         type="button"
         aria-label="More options"
         title="More options"
-        className="bg-gray-100 hover:bg-gray-200 text-gray-800 p-1.5 rounded-lg transition-colors flex items-center"
+        className="bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-[#303134] dark:hover:bg-[#3c4043] dark:text-[#e3e3e3] p-1.5 rounded-lg transition-colors flex items-center"
       >
         <EllipsisVertical className="w-4 h-4" />
       </button>
@@ -129,7 +129,7 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated, usage, duration
       {showMenu && (
         <div
           ref={menuRef}
-          className={`absolute left-0 z-50 w-56 bg-white border border-gray-200 rounded-lg shadow-xl ${
+          className={`absolute left-0 z-50 w-56 bg-white dark:bg-[#28292a] border border-gray-200 dark:border-[#3c4043] rounded-lg shadow-xl ${
             isAbove
               ? 'bottom-full mb-2'
               : 'top-full mt-2'
@@ -140,27 +140,27 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated, usage, duration
               <button
                 type="button"
                 onClick={handleListen}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100 rounded-t-lg"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-800 dark:text-[#e3e3e3] hover:bg-gray-100 dark:hover:bg-[#353638] rounded-t-lg"
               >
                 <ListenIcon className="w-4 h-4" />
                 {listenLabel}
               </button>
             </li>
           </ul>
-          <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-200">
-            Used <span className="font-medium text-gray-800 break-all">{model || 'Unknown'}</span> model
+          <div className="px-3 py-2 text-xs text-gray-500 dark:text-[#9aa0a6] border-t border-gray-200 dark:border-[#3c4043]">
+            Used <span className="font-medium text-gray-800 dark:text-[#e3e3e3] break-all">{model || 'Unknown'}</span> model
             {durationMs != null && (
-              <div className="mt-1">Time taken: <span className="font-medium text-gray-800">{(durationMs / 1000).toFixed(1)} s</span></div>
+              <div className="mt-1">Time taken: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{(durationMs / 1000).toFixed(1)} s</span></div>
             )}
             {usage && (
               <div className="mt-1 space-y-0.5">
-                <div>Input tokens: <span className="font-medium text-gray-800">{usage.inputTokens.toLocaleString()}</span></div>
-                <div>Output tokens: <span className="font-medium text-gray-800">{usage.outputTokens.toLocaleString()}</span></div>
-                <div>Cost: <span className="font-medium text-gray-800">{usage.costUsd === null ? 'Unavailable' : formatCost(usage.costUsd)}</span></div>
+                <div>Input tokens: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.inputTokens.toLocaleString()}</span></div>
+                <div>Output tokens: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.outputTokens.toLocaleString()}</span></div>
+                <div>Cost: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.costUsd === null ? 'Unavailable' : formatCost(usage.costUsd)}</span></div>
               </div>
             )}
             {truncated && (
-              <div className="mt-1 text-amber-700">Reply stopped at the length limit</div>
+              <div className="mt-1 text-amber-700 dark:text-amber-400">Reply stopped at the length limit</div>
             )}
           </div>
         </div>

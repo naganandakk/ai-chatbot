@@ -341,7 +341,7 @@ const ChatContainer = () => {
               onClick={scrollToBottom}
               aria-label="Scroll to bottom"
               title="Scroll to bottom"
-              className="absolute left-1/2 -translate-x-1/2 -top-14 z-10 p-2 rounded-full bg-white text-[#3c4043] shadow-md border border-[#dadce0] hover:bg-[#f1f3f4] transition-colors"
+              className="absolute left-1/2 -translate-x-1/2 -top-14 z-10 p-2 rounded-full bg-white text-[#3c4043] shadow-md border border-[#dadce0] hover:bg-[#f1f3f4] dark:bg-[#303134] dark:text-[#e3e3e3] dark:border-[#3c4043] dark:hover:bg-[#3c4043] transition-colors"
             >
               <ArrowDown className="w-5 h-5" />
             </button>

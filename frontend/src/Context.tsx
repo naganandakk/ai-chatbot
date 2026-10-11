@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { ChatSession, SessionSummary } from "./api";
 
 type NotificationVariant = "error" | "success";
@@ -23,6 +23,24 @@ function readStoredModel(): string {
   }
 }
 
+type Theme = "light" | "dark";
+
+// Keeps the theme the user picked, so a page refresh keeps it
+const THEME_STORAGE_KEY = "ai-chat.theme";
+
+// Until the user picks a theme, follow the OS setting
+function readStoredTheme(): Theme {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch {
+    // Storage can be blocked, e.g. in some private browsing modes
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 interface AppContextValue {
   sidebarOpen: boolean;
   setSidebarOpen: Setter<boolean>;
@@ -42,6 +60,8 @@ interface AppContextValue {
   setInputMessage: Setter<string>;
   selectedModel: string;
   selectModel: (modelId: string) => void;
+  theme: Theme;
+  toggleTheme: () => void;
   promptFocusRequest: number;
   requestPromptFocus: () => void;
   notifications: AppNotification[];
@@ -83,6 +103,20 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       // The selection still applies for this page load if storage is unavailable
     }
   }, []);
+  const [theme, setTheme] = useState<Theme>(readStoredTheme);
+  useEffect(() => {
+    // Tailwind's `dark:` variants are keyed on the `dark` class on <html>
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+  const toggleTheme = useCallback(() => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch {
+      // The theme still applies for this page load if storage is unavailable
+    }
+  }, [theme]);
   // Bumped to focus the prompt even when it's already focus-worthy, e.g. clicking New Chat on an empty chat
   const [promptFocusRequest, setPromptFocusRequest] = useState<number>(0);
   const requestPromptFocus = useCallback(() => setPromptFocusRequest((count) => count + 1), []);
@@ -118,6 +152,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       editingChatId, setEditingChatId,
       inputMessage, setInputMessage,
       selectedModel, selectModel,
+      theme, toggleTheme,
       promptFocusRequest, requestPromptFocus,
       notifications, notifyError, notifySuccess, dismissNotification
     }}>

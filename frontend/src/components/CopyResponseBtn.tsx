@@ -125,8 +125,8 @@ const CopyResponseBtn = ({ targetId }: CopyResponseBtnProps) => {
       title="Copy response"
       className={`p-1.5 rounded-lg transition-colors flex items-center ${
         copied
-          ? 'bg-emerald-100 text-emerald-600'
-          : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+          ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+          : 'bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-[#303134] dark:hover:bg-[#3c4043] dark:text-[#e3e3e3]'
       }`}
     >
       <Icon className="w-4 h-4" />

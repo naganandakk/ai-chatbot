@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles
+  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Moon, Sun
 } from 'lucide-react';
 import { api, ChatSession, SessionSummary } from "../api";
 import { useAppContext } from "../Context";
@@ -18,7 +18,8 @@ const Sidebar = () => {
     notifyError, notifySuccess,
     isGenerating, setIsGenerating,
     menuOpenId, setMenuOpenId,
-    editingChatId, setEditingChatId
+    editingChatId, setEditingChatId,
+    theme, toggleTheme
   } = useAppContext();
   const { deleteChat, clearChat, renameChat } = useSessionActions();
   const editingChat = sessions.find(session => session.id === editingChatId);
@@ -221,6 +222,28 @@ const Sidebar = () => {
             );
           })}
         </div>)}
+
+        {sidebarOpen && (
+          <div className="p-3 border-t border-[#dadce0]/50 dark:border-[#3c4043]/50">
+            <button
+              onClick={() => {
+                toggleTheme();
+                closeSidebarOnMobile();
+              }}
+              role="switch"
+              aria-checked={theme === 'dark'}
+              className="flex items-center justify-between w-full rounded-full py-1 px-3 text-sm font-medium text-[#3c4043] dark:text-[#c4c7c5] hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                <span>Dark mode</span>
+              </span>
+              <span className={`inline-flex items-center h-5 w-9 p-0.5 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#8ab4f8]' : 'bg-[#dadce0]'}`}>
+                <span className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
+              </span>
+            </button>
+          </div>
+        )}
 
         {editingChat && (
           <RenameModal

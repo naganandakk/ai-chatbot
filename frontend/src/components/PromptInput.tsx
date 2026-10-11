@@ -4,6 +4,8 @@ import {
 import { useEffect, useRef } from 'react';
 import { api, ChatSession, Message, SessionSummary, StreamError } from "../api";
 import { useAppContext } from "../Context";
+import { useIsDesktop } from "../useIsDesktop";
+import ModelPicker from "./ModelPicker";
 
 const PromptInput = () => {
   const {
@@ -12,10 +14,12 @@ const PromptInput = () => {
     isLoadingSession,
     isGenerating, setIsGenerating,
     inputMessage, setInputMessage,
+    selectedModel,
     promptFocusRequest,
     notifyError
   } = useAppContext();
   const inputRef = useRef<HTMLInputElement>(null);
+  const isDesktop = useIsDesktop();
 
   // Focus the prompt when no chat is open. Desktop only, so phones don't pop the keyboard on load
   useEffect(() => {
@@ -95,6 +99,7 @@ const PromptInput = () => {
       await api.streamMessage(
         session.id,
         userText,
+        selectedModel,
         (chunk) => {
           setActiveSession((currentSession) => {
             if (!currentSession || currentSession.id !== session.id) {
@@ -176,9 +181,10 @@ const PromptInput = () => {
   }
 
   return (
-    <form onSubmit={handleSendMessage} className="relative flex items-center bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border border-transparent focus-within:border-[#dadce0]">
-      <input ref={inputRef} type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder={isLoadingSession ? "Loading chat..." : "Enter a prompt here..."} className="w-full bg-transparent py-4 pl-6 pr-14 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
-      <button type="submit" disabled={!inputMessage.trim() || isGenerating || isLoadingSession} className={`absolute right-3 p-2 rounded-full ${inputMessage.trim() && !isGenerating && !isLoadingSession ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
+    <form onSubmit={handleSendMessage} className="flex items-center gap-1 bg-[#f0f4f9] dark:bg-[#1e1f20] rounded-3xl border border-transparent focus-within:border-[#dadce0]">
+      <input ref={inputRef} type="text" value={inputMessage} onChange={e => setInputMessage(e.target.value)} placeholder={isLoadingSession ? "Loading chat..." : "Enter a prompt here..."} className="min-w-0 w-full flex-1 bg-transparent py-4 pl-6 pr-2 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
+      {isDesktop && <ModelPicker />}
+      <button type="submit" disabled={!inputMessage.trim() || isGenerating || isLoadingSession} className={`shrink-0 mr-2 p-2 rounded-full ${inputMessage.trim() && !isGenerating && !isLoadingSession ? 'bg-[#1a73e8] text-white' : 'text-[#9aa0a6] cursor-not-allowed'}`}>
         <Send className="w-4 h-4" />
       </button>
     </form>

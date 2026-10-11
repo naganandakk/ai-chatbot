@@ -23,6 +23,16 @@ export type ChatSession = SessionSummary & {
   messages: Message[];
 };
 
+export type ModelOption = {
+  id: string;
+  name: string;
+};
+
+export type ModelList = {
+  provider: string;
+  models: ModelOption[];
+};
+
 export type ConfirmationMessage = {
   message: string
 }
@@ -60,6 +70,7 @@ export class StreamError extends Error {
 async function streamMessage(
   sessionId: string,
   message: string,
+  model: string,
   onDelta: (text: string) => void,
   onReset: () => void,
   onDone: (result: StreamDone) => void,
@@ -69,7 +80,7 @@ async function streamMessage(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, model }),
   });
 
   if (!response.ok || !response.body) {
@@ -152,6 +163,9 @@ export const api = {
       },
       body: JSON.stringify({ title }),
     }),
+
+  listModels: () =>
+    request<ModelList>("/models"),
 
   streamMessage,
 };

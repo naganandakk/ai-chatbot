@@ -5,6 +5,7 @@ from anthropic import Anthropic, APIError
 from ..settings import DEFAULT_MAX_TOKENS
 from .base import (
     Citation,
+    ModelInfo,
     ProviderError,
     ProviderEvent,
     ReplyReset,
@@ -68,5 +69,15 @@ class AnthropicProvider:
                 if not wrote_text:
                     raise TruncatedReplyError()
                 yield ReplyTruncated()
+        except APIError as error:
+            raise ProviderError(str(error)) from error
+
+    def list_models(self) -> list[ModelInfo]:
+        try:
+            # Iterating the page fetches every page of results
+            return [
+                ModelInfo(id=model.id, name=model.display_name)
+                for model in self._client.models.list()
+            ]
         except APIError as error:
             raise ProviderError(str(error)) from error

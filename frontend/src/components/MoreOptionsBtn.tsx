@@ -86,6 +86,8 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated }: MoreOptionsBt
   }, [playbackId]);
 
   const handleListen = () => {
+    setShowMenu(false);
+
     if (playbackStatus === 'playing') {
       speechPlayback.pause();
     } else if (playbackStatus === 'paused') {

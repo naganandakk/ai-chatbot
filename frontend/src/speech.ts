@@ -6,10 +6,17 @@ type PlaybackSnapshot = {
   status: PlaybackStatus;
   // Identifies the message being read, so each message's menu can show its own state
   id: string | null;
+  // Index of the sentence being read, and how many sentences the message has
+  sentence: number;
+  sentenceCount: number;
 };
 
-let snapshot: PlaybackSnapshot = { status: 'idle', id: null };
+const IDLE: PlaybackSnapshot = { status: 'idle', id: null, sentence: 0, sentenceCount: 0 };
+
+let snapshot: PlaybackSnapshot = IDLE;
 let activeUtterance: SpeechSynthesisUtterance | null = null;
+// Speech synthesis cannot seek inside an utterance, so the message is read one sentence at a time
+let sentences: string[] = [];
 const listeners = new Set<() => void>();
 
 const updateSnapshot = (next: PlaybackSnapshot) => {
@@ -34,28 +41,50 @@ const cancelActiveUtterance = () => {
   }
 };
 
+const splitSentences = (text: string): string[] =>
+  (text.match(/[^.!?]+[.!?]*/g) ?? []).map((sentence) => sentence.trim()).filter(Boolean);
+
+const speakSentence = (id: string, index: number) => {
+  cancelActiveUtterance();
+
+  const utterance = new SpeechSynthesisUtterance(sentences[index]);
+  // Only the current utterance may move playback on, so a cancelled one cannot touch a newer one
+  utterance.onend = () => {
+    if (activeUtterance !== utterance) {
+      return;
+    }
+
+    if (index + 1 < sentences.length) {
+      speakSentence(id, index + 1);
+    } else {
+      activeUtterance = null;
+      updateSnapshot(IDLE);
+    }
+  };
+  utterance.onerror = () => {
+    if (activeUtterance === utterance) {
+      activeUtterance = null;
+      updateSnapshot(IDLE);
+    }
+  };
+
+  activeUtterance = utterance;
+  window.speechSynthesis.speak(utterance);
+  updateSnapshot({ status: 'playing', id, sentence: index, sentenceCount: sentences.length });
+};
+
 export const speechPlayback = {
   play(id: string, text: string) {
     if (!('speechSynthesis' in window)) {
       return;
     }
 
-    cancelActiveUtterance();
+    sentences = splitSentences(text);
+    if (sentences.length === 0) {
+      return;
+    }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    // Only the current utterance may reset the state, so a cancelled one cannot clear a newer one
-    const finish = () => {
-      if (activeUtterance === utterance) {
-        activeUtterance = null;
-        updateSnapshot({ status: 'idle', id: null });
-      }
-    };
-    utterance.onend = finish;
-    utterance.onerror = finish;
-
-    activeUtterance = utterance;
-    window.speechSynthesis.speak(utterance);
-    updateSnapshot({ status: 'playing', id });
+    speakSentence(id, 0);
   },
 
   pause() {
@@ -76,6 +105,21 @@ export const speechPlayback = {
     updateSnapshot({ ...snapshot, status: 'playing' });
   },
 
+  // Moves to the sentence `offset` away. Going past the last sentence finishes playback
+  seek(offset: number) {
+    if (snapshot.status === 'idle' || snapshot.id === null) {
+      return;
+    }
+
+    const index = snapshot.sentence + offset;
+    if (index >= sentences.length) {
+      speechPlayback.stop();
+      return;
+    }
+
+    speakSentence(snapshot.id, Math.max(0, index));
+  },
+
   // True while the given message is playing or paused
   isActive(id: string) {
     return snapshot.id === id && snapshot.status !== 'idle';
@@ -87,7 +131,8 @@ export const speechPlayback = {
     }
 
     cancelActiveUtterance();
-    updateSnapshot({ status: 'idle', id: null });
+    sentences = [];
+    updateSnapshot(IDLE);
   },
 };
 

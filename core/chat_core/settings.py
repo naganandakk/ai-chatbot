@@ -8,6 +8,21 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 DEFAULT_MAX_TOKENS = 8192
 
+API_KEY_NAMES = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
+
+
+def api_key_from_env(provider: str) -> str:
+    key_name = API_KEY_NAMES[provider]
+    api_key = os.getenv(key_name)
+
+    if not api_key:
+        raise RuntimeError(f"{key_name} is required for the {provider} provider")
+
+    return api_key
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -21,20 +36,12 @@ class Settings:
     def from_env(cls) -> "Settings":
         provider = os.getenv("AI_PROVIDER", "").lower()
 
-        if provider not in {"anthropic", "openrouter"}:
+        if provider not in API_KEY_NAMES:
             raise RuntimeError(
                 "AI_PROVIDER must be set to 'anthropic' or 'openrouter'"
             )
 
-        key_name = (
-            "OPENROUTER_API_KEY"
-            if provider == "openrouter"
-            else "ANTHROPIC_API_KEY"
-        )
-        api_key = os.getenv(key_name)
-
-        if not api_key:
-            raise RuntimeError(f"{key_name} is required when AI_PROVIDER={provider}")
+        api_key = api_key_from_env(provider)
 
         default_model = (
             "anthropic/claude-haiku-4.5"

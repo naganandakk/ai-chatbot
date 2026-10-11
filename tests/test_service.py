@@ -340,6 +340,35 @@ def test_openrouter_stream_reply_uses_openrouter_sdk_and_saves_messages():
     assert "plugins" not in requests[0]
 
 
+def test_openrouter_retries_with_low_reasoning_when_model_requires_it():
+    store = InMemorySessionStore()
+    session = store.create()
+    efforts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        effort = json.loads(request.content)["reasoning"]["effort"]
+        efforts.append(effort)
+        if effort == "none":
+            return httpx.Response(400, json={"error": {
+                "message": "Reasoning is mandatory for this endpoint and cannot be disabled.",
+                "code": 400,
+            }})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=httpx.ByteStream(openrouter_sse(openrouter_chunk("Hi")).encode()),
+        )
+
+    provider = OpenRouterProvider(api_key="test-key", transport=httpx.MockTransport(handler))
+    service = ChatService(store, provider=provider, settings=openrouter_settings())
+
+    assert "".join(service.stream_reply(session.id, "Hello")) == "Hi"
+    assert "".join(service.stream_reply(session.id, "Again")) == "Hi"
+
+    # The first reply tries "none", then "low". The second goes straight to "low".
+    assert efforts == ["none", "low", "low"]
+
+
 def test_openrouter_web_search_tells_model_not_to_narrate_the_search():
     store = InMemorySessionStore()
     session = store.create()

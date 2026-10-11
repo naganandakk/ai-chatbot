@@ -1,9 +1,15 @@
 import json
+import os
 
 from flask import Flask, Response, jsonify, request, stream_with_context
 from flask_cors import CORS
 
-from core.chat_core.providers import ReplyReset, TruncatedReplyError
+from core.chat_core.providers import (
+    ProviderError,
+    ReplyReset,
+    TruncatedReplyError,
+    create_provider_by_name,
+)
 from core.chat_core.service import ChatService
 from core.chat_core.store import InMemorySessionStore, SessionStore
 
@@ -73,6 +79,28 @@ def create_app(
             return jsonify({"error": "Session not found"}), 404
 
         return jsonify(session.to_dict(include_messages=False))
+
+    # One provider per name, so each provider's HTTP client is reused across requests
+    model_providers = {}
+
+    @app.get("/api/models")
+    def list_models():
+        provider_name = request.args.get("provider") or os.getenv("AI_PROVIDER", "")
+        provider_name = provider_name.strip().lower()
+
+        try:
+            if provider_name not in model_providers:
+                model_providers[provider_name] = create_provider_by_name(provider_name)
+            models = model_providers[provider_name].list_models()
+        except RuntimeError as error:
+            return jsonify({"error": str(error)}), 400
+        except ProviderError as error:
+            return jsonify({"error": str(error)}), 502
+
+        return jsonify({
+            "provider": provider_name,
+            "models": [{"id": model.id, "name": model.name} for model in models],
+        })
 
     def session_state(session_id: str) -> dict | None:
         session = session_store.get(session_id)

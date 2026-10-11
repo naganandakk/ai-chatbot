@@ -3,7 +3,6 @@ import ChatContainer from './components/ChatContainer';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import NotificationStack from './components/NotificationStack';
-import PlaybackControl from './components/PlaybackControl';
 
 const App = () => {
   // iOS Safari pans the page when the keyboard opens, so pin the app to the visible area
@@ -35,7 +34,6 @@ const App = () => {
       <NotificationStack/>
       <Sidebar/>
       <main className="flex-1 flex flex-col h-full relative overflow-hidden w-full">
-        <PlaybackControl/>
         <Header/>
         <ChatContainer/>
       </main>

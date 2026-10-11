@@ -44,6 +44,12 @@ class ReplyReset:
 ProviderEvent = TextDelta | Citation | ReplyTruncated | ReplyReset
 
 
+@dataclass(frozen=True)
+class ModelInfo:
+    id: str
+    name: str
+
+
 class ModelProvider(Protocol):
     """Streams one model reply as normalized events.
 
@@ -59,4 +65,8 @@ class ModelProvider(Protocol):
         messages: list[dict],
         tools: list[str],
     ) -> Iterator[ProviderEvent]:
+        ...
+
+    def list_models(self) -> list[ModelInfo]:
+        """Returns the models this provider's account can use, with a display name for each."""
         ...

@@ -11,6 +11,18 @@ interface AppNotification {
 
 type Setter<T> = React.Dispatch<React.SetStateAction<T>>;
 
+// Keeps the model the user last picked, so a page refresh reopens with it
+const MODEL_STORAGE_KEY = "ai-chat.model";
+
+function readStoredModel(): string {
+  try {
+    return window.localStorage.getItem(MODEL_STORAGE_KEY) ?? "";
+  } catch {
+    // Storage can be blocked, e.g. in some private browsing modes
+    return "";
+  }
+}
+
 interface AppContextValue {
   sidebarOpen: boolean;
   setSidebarOpen: Setter<boolean>;
@@ -30,6 +42,8 @@ interface AppContextValue {
   setEditTitleText: Setter<string>;
   inputMessage: string;
   setInputMessage: Setter<string>;
+  selectedModel: string;
+  selectModel: (modelId: string) => void;
   promptFocusRequest: number;
   requestPromptFocus: () => void;
   notifications: AppNotification[];
@@ -63,6 +77,15 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitleText, setEditTitleText] = useState<string>('');
   const [inputMessage, setInputMessage] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>(readStoredModel);
+  const selectModel = useCallback((modelId: string) => {
+    setSelectedModel(modelId);
+    try {
+      window.localStorage.setItem(MODEL_STORAGE_KEY, modelId);
+    } catch {
+      // The selection still applies for this page load if storage is unavailable
+    }
+  }, []);
   // Bumped to focus the prompt even when it's already focus-worthy, e.g. clicking New Chat on an empty chat
   const [promptFocusRequest, setPromptFocusRequest] = useState<number>(0);
   const requestPromptFocus = useCallback(() => setPromptFocusRequest((count) => count + 1), []);
@@ -98,6 +121,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       editingChatId, setEditingChatId,
       editTitleText, setEditTitleText,
       inputMessage, setInputMessage,
+      selectedModel, selectModel,
       promptFocusRequest, requestPromptFocus,
       notifications, notifyError, notifySuccess, dismissNotification
     }}>

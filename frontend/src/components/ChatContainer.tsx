@@ -12,8 +12,11 @@ import { useAppContext } from "../Context";
 import SourcesBtn from "./SourcesBtn";
 import MoreOptionsBtn from './MoreOptionsBtn';
 import PromptInput from './PromptInput';
+import PlaybackControl from './PlaybackControl';
+import { useIsDesktop } from '../useIsDesktop';
 
 const ChatContainer = () => {
+  const isDesktop = useIsDesktop();
   const {
     activeSession,
     isLoadingSession,
@@ -273,8 +276,14 @@ const ChatContainer = () => {
 
   return (
     <>
+      {isDesktop && (
+        <div className="absolute top-4 right-4 z-20">
+          <PlaybackControl floating />
+        </div>
+      )}
       <div ref={scrollRef} onScroll={updateScrollToBottom} className="flex-1 overflow-y-auto p-4 w-full">
         <div className="max-w-3xl mx-auto w-full space-y-6">
+          {!isDesktop && <PlaybackControl />}
           {chatContainerContent}
         </div>
       </div>

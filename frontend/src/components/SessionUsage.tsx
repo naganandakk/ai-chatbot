@@ -53,7 +53,7 @@ const SessionUsage = () => {
       </button>
 
       {showDetails && (
-        <div className="fixed left-4 right-4 top-14 md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-60 z-50 bg-white border border-gray-200 rounded-lg shadow-xl px-3 py-2 text-xs text-gray-500">
+        <div className="fixed right-4 top-14 w-max max-w-[calc(100vw-2rem)] md:absolute md:right-0 md:top-full md:mt-2 md:w-60 z-50 bg-white border border-gray-200 rounded-lg shadow-xl px-3 py-2 text-xs text-gray-500">
           <div className="font-medium text-gray-800 text-sm">Session usage</div>
           <div className="mt-1 space-y-0.5">
             <div>Replies: <span className="font-medium text-gray-800">{replies.toLocaleString()}</span></div>

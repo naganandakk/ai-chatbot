@@ -323,7 +323,7 @@ const ChatContainer = () => {
   return (
     <>
       {isDesktop && (
-        <div className="absolute top-4 right-4 z-20">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
           <PlaybackControl floating />
         </div>
       )}

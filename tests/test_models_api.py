@@ -27,15 +27,18 @@ def test_openrouter_list_models_maps_sdk_models_to_id_and_name():
         SimpleNamespace(id="anthropic/claude-haiku-4.5", name="Anthropic: Claude Haiku 4.5"),
     ]
     provider = OpenRouterProvider(api_key="test-key")
-    provider._client = SimpleNamespace(
-        models=SimpleNamespace(
-            list=lambda: SimpleNamespace(result=SimpleNamespace(data=sdk_models)),
-        ),
-    )
+    calls = []
+
+    def list_for_user(*, security):
+        calls.append(security)
+        return SimpleNamespace(result=SimpleNamespace(data=sdk_models))
+
+    provider._client = SimpleNamespace(models=SimpleNamespace(list_for_user=list_for_user))
 
     assert provider.list_models() == [
         ModelInfo(id="anthropic/claude-haiku-4.5", name="Anthropic: Claude Haiku 4.5"),
     ]
+    assert calls == [{"bearer": "test-key"}]
 
 
 class FailingProvider:

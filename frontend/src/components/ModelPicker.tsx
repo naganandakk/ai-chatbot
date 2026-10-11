@@ -16,9 +16,11 @@ const VENDOR_NAMES: Record<string, string> = {
   qwen: "Qwen",
 };
 
-// Model ids without a prefix (direct Anthropic) belong to the provider the list came from
+// Model ids without a prefix (direct Anthropic) belong to the provider the list came from.
+// OpenRouter marks "latest" alias ids with a leading "~", e.g. "~anthropic/claude-haiku-latest"
 function vendorOf(model: ModelOption, provider: string): string {
-  const prefix = model.id.includes("/") ? model.id.split("/")[0] : provider;
+  const id = model.id.replace(/^~/, "");
+  const prefix = id.includes("/") ? id.split("/")[0] : provider;
   return VENDOR_NAMES[prefix] ?? prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 

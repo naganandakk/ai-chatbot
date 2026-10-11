@@ -2,7 +2,7 @@ import {
   ArrowDown, Sparkles, Code, Compass
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message } from "../api";
 import CopyContentBtn from './CopyContentBtn';
@@ -14,6 +14,114 @@ import MoreOptionsBtn from './MoreOptionsBtn';
 import PromptInput from './PromptInput';
 import PlaybackControl from './PlaybackControl';
 import { useIsDesktop } from '../useIsDesktop';
+
+// Markdown spacing: blocks get a shared vertical rhythm, and the wrapper trims the outer edges
+const markdownComponents: Components = {
+  p: ({ children }) => (
+    <p className="my-3 text-base leading-normal tracking-normal font-normal">
+      {children}
+    </p>
+  ),
+
+  h1: ({ children }) => (
+    <h1 className="text-lg leading-snug font-semibold text-zinc-950 dark:text-white mt-4 mb-2">
+      {children}
+    </h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="text-base leading-snug font-semibold text-zinc-950 dark:text-white mt-4 mb-1.5">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="text-sm leading-snug font-semibold text-zinc-900 dark:text-zinc-200 mt-3 mb-1">
+      {children}
+    </h3>
+  ),
+
+  ul: ({ children }) => (
+    <ul className="list-disc pl-5 my-2 space-y-1 text-base leading-normal">
+      {children}
+    </ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="list-decimal pl-5 my-2 space-y-1 text-base leading-normal">
+      {children}
+    </ol>
+  ),
+  li: ({ children }) => (
+    <li className="pl-0.5 [&>p]:inline [&>p]:m-0 [&>ul]:my-1 [&>ol]:my-1">{children}</li>
+  ),
+
+  blockquote: ({ children }) => (
+    <blockquote className="my-3 border-l-2 border-zinc-300 dark:border-zinc-700 pl-3 text-zinc-600 dark:text-zinc-400">
+      {children}
+    </blockquote>
+  ),
+
+  table: ({ children }) => (
+    <div className="my-3 overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-800">
+      <table className="w-full text-left text-sm border-collapse m-0">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="bg-zinc-100 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children }) => (
+    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      {children}
+    </tbody>
+  ),
+  tr: ({ children }) => (
+    <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+      {children}
+    </tr>
+  ),
+  th: ({ children }) => (
+    <th className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-200 [&>p]:inline [&>p]:m-0">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="px-3 py-1.5 text-zinc-800 dark:text-zinc-300 [&>p]:inline [&>p]:m-0">
+      {children}
+    </td>
+  ),
+
+  // Gemini renders monospaced components exactly 1px down from normal variant text
+  code: ({ children, ...props }) => {
+    const isBlock = props.className?.includes('language-');
+    if (isBlock) return <code {...props}>{children}</code>;
+
+    return (
+      <code
+        className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 px-1 py-0.5 rounded text-sm font-mono border border-zinc-200/50 dark:border-zinc-700/50 break-words"
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+
+  pre: ({ children, ...props }) => (
+    <div className="relative group my-3 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
+      <CopyContentBtn>{children}</CopyContentBtn>
+      <pre className="p-3 overflow-x-auto text-sm leading-5 text-zinc-100 m-0" {...props}>
+        {children}
+      </pre>
+    </div>
+  ),
+
+  strong: ({ children }) => (
+    <strong className="font-semibold text-zinc-950 dark:text-white">
+      {children}
+    </strong>
+  ),
+};
 
 const ChatContainer = () => {
   const isDesktop = useIsDesktop();
@@ -120,116 +228,8 @@ const ChatContainer = () => {
             <div
               onClick={msg.role === 'user' ? () => toggleCopyable(idx) : undefined}
               className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'max-w-[100%] bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none cursor-pointer' : 'w-full rounded-tl-none'}`}>
-              <div className="whitespace-pre-wrap" id={`response-${idx}`}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    // Paragraph Sizing (Standard text blocks)
-                    p: ({ children }) => (
-                      <p className="mt-0 mb-0 text-base leading-normal tracking-normal font-normal">
-                        {children}
-                      </p>
-                    ),
-
-                    // Headings Scale
-                    h1: ({ children }) => (
-                      <h1 className="text-xl leading-tight tracking-tight font-semibold text-zinc-950 dark:text-white mt-2.5 mb-1">
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-lg leading-snug tracking-tight font-semibold text-zinc-950 dark:text-white mt-2 mb-1">
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-md leading-snug tracking-normal font-semibold text-zinc-900 dark:text-zinc-200 mt-1.5 mb-0.5">
-                        {children}
-                      </h3>
-                    ),
-
-                    // Lists Layout Scale
-                    ul: ({ children }) => (
-                      <ul className="list-disc pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal pl-5 mt-0 mb-0 space-y-0 text-base leading-normal">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children }) => (
-                      <li className="pl-0.5 [&>p]:inline [&>p]:mb-0 [&>p]:mt-0">{children}</li>
-                    ),
-
-                    // Tables Styling
-                    table: ({ children }) => (
-                      <div className="my-2 overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-800">
-                        <table className="w-full text-left text-sm border-collapse m-0">
-                          {children}
-                        </table>
-                      </div>
-                    ),
-                    thead: ({ children }) => (
-                      <thead className="bg-zinc-100 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800">
-                        {children}
-                      </thead>
-                    ),
-                    tbody: ({ children }) => (
-                      <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                        {children}
-                      </tbody>
-                    ),
-                    tr: ({ children }) => (
-                      <tr className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
-                        {children}
-                      </tr>
-                    ),
-                    th: ({ children }) => (
-                      <th className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-200 [&>p]:inline [&>p]:m-0">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="px-3 py-1.5 text-zinc-800 dark:text-zinc-300 [&>p]:inline [&>p]:m-0">
-                        {children}
-                      </td>
-                    ),
-
-                    // Inline Code & Blocks Scale
-                    // Gemini renders monospaced components exactly 1px down from normal variant text
-                    code: ({ children, ...props }) => {
-                      const isBlock = props.className?.includes('language-');
-                      if (isBlock) return <code {...props}>{children}</code>;
-
-                      return (
-                        <code
-                          className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 px-1 py-0.5 rounded text-sm font-mono border border-zinc-200/50 dark:border-zinc-700/50 break-words"
-                          {...props}
-                        >
-                          {children}
-                        </code>
-                      );
-                    },
-
-                    pre: ({ children, ...props }) => (
-                      <div className="relative group my-1.5 rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800">
-                        <CopyContentBtn>{children}</CopyContentBtn>
-                        <pre className="p-2.5 overflow-x-auto text-sm leading-5 text-zinc-100 m-0" {...props}>
-                          {children}
-                        </pre>
-                      </div>
-                    ),
-
-                    // Bold Text Configuration
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-zinc-950 dark:text-white">
-                        {children}
-                      </strong>
-                    )
-                  }}
-                >
+              <div className={`${msg.role === 'user' ? 'whitespace-pre-wrap ' : ''}[&>:first-child]:mt-0 [&>:last-child]:mb-0`} id={`response-${idx}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {msg.content}
                 </ReactMarkdown>
               </div>

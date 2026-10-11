@@ -36,6 +36,7 @@ class OpenRouterProvider:
         max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> None:
         self._http = CitationHttpClient(transport=transport)
+        self._api_key = api_key
         self._client = OpenRouter(api_key=api_key, client=self._http)
         self._max_tokens = max_tokens
         # Models that rejected effort "none". Remembered so later replies skip that request.
@@ -108,9 +109,14 @@ class OpenRouterProvider:
             raise ProviderError(str(error)) from error
 
     def list_models(self) -> list[ModelInfo]:
+        # /models/user applies the account's provider preferences and privacy settings,
+        # so only models the account can actually use are returned.
         try:
-            response = self._client.models.list()
+            response = self._client.models.list_for_user(security={"bearer": self._api_key})
         except OpenRouterError as error:
             raise ProviderError(str(error)) from error
+
+        if response is None:
+            return []
 
         return [ModelInfo(id=model.id, name=model.name) for model in response.result.data]

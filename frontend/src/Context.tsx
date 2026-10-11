@@ -38,8 +38,6 @@ interface AppContextValue {
   setMenuOpenId: Setter<string | null>;
   editingChatId: string | null;
   setEditingChatId: Setter<string | null>;
-  editTitleText: string;
-  setEditTitleText: Setter<string>;
   inputMessage: string;
   setInputMessage: Setter<string>;
   selectedModel: string;
@@ -75,7 +73,6 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
-  const [editTitleText, setEditTitleText] = useState<string>('');
   const [inputMessage, setInputMessage] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>(readStoredModel);
   const selectModel = useCallback((modelId: string) => {
@@ -119,7 +116,6 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       isGenerating, setIsGenerating,
       menuOpenId, setMenuOpenId,
       editingChatId, setEditingChatId,
-      editTitleText, setEditTitleText,
       inputMessage, setInputMessage,
       selectedModel, selectModel,
       promptFocusRequest, requestPromptFocus,

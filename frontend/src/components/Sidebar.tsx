@@ -1,10 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Check, X
+  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles
 } from 'lucide-react';
 import { api, ChatSession, SessionSummary } from "../api";
 import { useAppContext } from "../Context";
 import ConfirmModal from "./ConfirmModal";
+import RenameModal from "./RenameModal";
+import { useSessionActions } from "../useSessionActions";
 
 const Sidebar = () => {
   const {
@@ -16,9 +18,10 @@ const Sidebar = () => {
     notifyError, notifySuccess,
     isGenerating, setIsGenerating,
     menuOpenId, setMenuOpenId,
-    editingChatId, setEditingChatId,
-    editTitleText, setEditTitleText
+    editingChatId, setEditingChatId
   } = useAppContext();
+  const { deleteChat, clearChat, renameChat } = useSessionActions();
+  const editingChat = sessions.find(session => session.id === editingChatId);
   const chatActionsRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const [pendingConfirm, setPendingConfirm] = useState<{ action: 'delete' | 'clear'; sessionId: string } | null>(null);
@@ -90,84 +93,20 @@ const Sidebar = () => {
   }
 
   async function deleteSession(sessionId: string) {
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      await api.deleteSession(sessionId);
-      setActiveSession(null);
-      setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
-      notifySuccess("Chat deleted");
-    } catch (requestError) {
-      notifyError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not delete the session",
-      );
-    } finally {
-      setMenuOpenId(null);
-      setPendingConfirm(null);
-    }
+    await deleteChat(sessionId);
+    setMenuOpenId(null);
+    setPendingConfirm(null);
   }
 
   async function clearChatHistory(sessionId: string) {
-    if (isGenerating) {
-      return;
-    }
-
-    try {
-      setActiveSession(await api.clearChatHistory(sessionId));
-      notifySuccess("Chat history cleared");
-    } catch (requestError) {
-      notifyError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not clear the session",
-      );
-    } finally {
-      setMenuOpenId(null);
-      setPendingConfirm(null);
-    }
-  }
-
-  async function renameSession(sessionId: string) {
-    if (isGenerating) {
-      return;
-    }
-
-    const trimmedTitle = editTitleText.trim();
-    const currentSession = sessions.find(session => session.id === sessionId);
-    if (!trimmedTitle || (currentSession && currentSession.title === trimmedTitle)) {
-      setEditingChatId(null);
-      return;
-    }
-
-    try {
-      await api.renameSession(sessionId, trimmedTitle);
-      notifySuccess("Chat renamed");
-      setSessions(prevSessions =>
-        prevSessions.map((session) =>
-          session.id === sessionId
-            ? { ...session, title: trimmedTitle }
-            : session
-        )
-      );
-    } catch (requestError) {
-      notifyError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not rename the session",
-      );
-    } finally {
-      setEditingChatId(null);
-    }
+    await clearChat(sessionId);
+    setMenuOpenId(null);
+    setPendingConfirm(null);
   }
 
   function handleStartEdit (e: React.MouseEvent, chat: SessionSummary) {
     e.stopPropagation();
     setEditingChatId(chat.id);
-    setEditTitleText(chat.title);
     setMenuOpenId(null);
   }
 
@@ -196,8 +135,8 @@ const Sidebar = () => {
   }, [menuOpenId]);
 
   useEffect(() => {
-    // The delete dialog sits outside the sidebar, so tapping it must not close the sidebar
-    if (!sidebarOpen || window.innerWidth >= 768 || pendingConfirm) {
+    // The dialogs sit outside the sidebar, so tapping them must not close the sidebar
+    if (!sidebarOpen || window.innerWidth >= 768 || pendingConfirm || editingChatId) {
       return;
     }
     const handleClickOutside = (event: PointerEvent) => {
@@ -211,7 +150,7 @@ const Sidebar = () => {
     return () => {
       document.removeEventListener('pointerdown', handleClickOutside, true);
     };
-  }, [sidebarOpen, pendingConfirm]);
+  }, [sidebarOpen, pendingConfirm, editingChatId]);
 
   return (
     <aside ref={sidebarRef} className={`fixed md:relative inset-y-0 left-0 z-50 flex flex-col border-r border-[#dadce0] dark:border-[#3c4043] bg-[#f8f9fa] dark:bg-[#1e1f20] transition-all duration-300 ease-in-out z-50 ${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden md:w-0'}`}>
@@ -254,15 +193,7 @@ const Sidebar = () => {
             return (
               <div key={chat.id} onClick={() => { if (!isEditing) openSession(chat.id); if (window.innerWidth < 768) setSidebarOpen(false);}} className={`group relative flex items-center justify-between px-3 py-1 rounded-full text-sm transition-colors ${isLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isActive ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : `font-medium text-[#3c4043] dark:text-[#c4c7c5] ${isLocked ? '' : 'hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30]'}`}`}>
                 <div className="flex items-center truncate flex-1 mr-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
-                      <input type="text" value={editTitleText} onChange={e => setEditTitleText(e.target.value)} autoFocus className="bg-white dark:bg-[#131314] text-[#202124] dark:text-white px-2 py-0.5 rounded text-xs w-full border border-[#1a73e8] focus:outline-none" />
-                      <button onClick={() => renameSession(chat.id)} className="p-1 text-green-600 rounded"><Check className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => setEditingChatId(null)} className="p-1 text-red-600 rounded"><X className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ) : (
-                    <span className="text-xs truncate">{chat.title}</span>
-                  )}
+                  <span className="text-xs truncate">{chat.title}</span>
                 </div>
 
                 {!isEditing && (
@@ -283,6 +214,17 @@ const Sidebar = () => {
             );
           })}
         </div>)}
+
+        {editingChat && (
+          <RenameModal
+            initialTitle={editingChat.title}
+            onCancel={() => setEditingChatId(null)}
+            onSave={(title) => {
+              setEditingChatId(null);
+              void renameChat(editingChat.id, title);
+            }}
+          />
+        )}
 
         {pendingConfirm && pendingConfirmSession && (
           pendingConfirm.action === 'delete' ? (

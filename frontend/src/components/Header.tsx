@@ -4,6 +4,7 @@ import {
 import { useAppContext } from "../Context";
 import { useIsDesktop } from "../useIsDesktop";
 import ModelPicker from "./ModelPicker";
+import SessionMenu from "./SessionMenu";
 import SessionUsage from "./SessionUsage";
 
 const Header = () => {
@@ -23,10 +24,11 @@ const Header = () => {
           <Menu className="w-5 h-5" />
         </button>
       )}
+      {/* On phones the picker sits here, so the prompt gets the full width */}
+      {!isDesktop && <ModelPicker />}
       <div className="ml-auto flex items-center gap-2">
         <SessionUsage />
-        {/* On phones the picker moves here, so the prompt gets the full width */}
-        {!isDesktop && <ModelPicker />}
+        {!isDesktop && <SessionMenu />}
       </div>
     </header>
   )

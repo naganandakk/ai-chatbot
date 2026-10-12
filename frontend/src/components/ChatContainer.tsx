@@ -161,8 +161,21 @@ const ChatContainer = () => {
       return;
     }
 
-    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    setShowScrollToBottom(distanceFromBottom > 80);
+    // Measured to the last message's body and footer, not the scroll end, because the streaming spacer sits below them
+    const bodies = element.querySelectorAll<HTMLElement>('[data-message-body]');
+    const footers = element.querySelectorAll<HTMLElement>('[data-message-footer]');
+    const latestBody = bodies[bodies.length - 1];
+    const latestFooter = footers[footers.length - 1];
+    if (!latestBody || !latestFooter) {
+      setShowScrollToBottom(false);
+      return;
+    }
+
+    const contentBottom = Math.max(
+      latestBody.getBoundingClientRect().bottom,
+      latestFooter.getBoundingClientRect().bottom,
+    );
+    setShowScrollToBottom(contentBottom > element.getBoundingClientRect().bottom);
   }, []);
 
   // Streamed text grows the list without firing a scroll event, so re-check on every update
@@ -243,7 +256,7 @@ const ChatContainer = () => {
           // Gives the latest reply enough height to scroll its start to the top while it streams
           className={isGenerating && idx === (activeSession?.messages.length ?? 0) - 1 ? 'min-h-[100dvh]' : undefined}
         >
-          <div className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`} data-user-message={msg.role === 'user' ? idx : undefined}>
+          <div className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`} data-message-body data-user-message={msg.role === 'user' ? idx : undefined}>
             {msg.role === 'user' && copyableIdx === idx && (
               <CopyMessageBtn text={msg.content} onHide={hideCopyable} />
             )}
@@ -272,7 +285,7 @@ const ChatContainer = () => {
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2" data-message-footer>
             {msg.role === 'assistant' && !(isGenerating && idx === (activeSession?.messages.length ?? 0) - 1) && (
               <CopyResponseBtn targetId={`response-${idx}`} />
             )}

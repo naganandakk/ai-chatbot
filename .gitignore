@@ -33,6 +33,7 @@ pnpm-debug.log*
 # TypeScript build cache
 frontend/**/*.tsbuildinfo
 frontend/tsconfig.tsbuildinfo
+frontend/certs/
 
 
 # Editors and operating systems

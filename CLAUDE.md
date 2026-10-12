@@ -31,6 +31,7 @@ Frontend (from `frontend/`):
 ```bash
 npm install
 npm run dev                          # Vite dev server on :5173, proxies /api -> 127.0.0.1:5000
+npm run dev:lan                      # same, over HTTPS on the LAN for phone voice prompts; needs mkcert certs in frontend/certs (see README)
 npm run build                        # runs tsc -b then vite build; passes
 ```
 

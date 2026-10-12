@@ -63,7 +63,7 @@ export const useVoiceInput = ({ onChange, currentText, onError }: UseVoiceInputO
     ? null
     : window.isSecureContext
       ? "Voice prompts are not supported in this browser. Try Chrome on Android or Safari on iPhone."
-      : "Voice prompts need a secure (HTTPS) connection.";
+      : "Voice prompts need a secure (HTTPS) connection. See the README for HTTPS on your local network.";
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   // The prompt text when listening started. Speech is appended to it, so interim results replace the last guess
   const baseTextRef = useRef<string>('');

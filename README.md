@@ -129,6 +129,36 @@ npm run dev
 
 Open the displayed Vite URL, normally `http://localhost:5173`. The Vite development server proxies browser requests from `/api` to Flask at `http://127.0.0.1:5000`.
 
+To use voice prompts from a phone on your network, see [Use voice prompts from a phone on the local network](#use-voice-prompts-from-a-phone-on-the-local-network).
+
+### Use voice prompts from a phone on the local network
+
+Browsers only allow the microphone on HTTPS or `localhost`, so voice prompts do not work when the phone opens `http://<your-ip>:5173`. To serve the dev server over HTTPS on your LAN, create a local certificate with [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert` on macOS):
+
+```bash
+mkcert -install                       # once per machine: trusts the local CA on this Mac
+cd frontend
+mkdir -p certs
+mkcert -cert-file certs/lan.pem -key-file certs/lan-key.pem <your-lan-ip> localhost 127.0.0.1
+```
+
+Find your LAN IP with `ipconfig getifaddr en0` (or `en1` on Wi-Fi on some Macs). Then start the frontend with the flag:
+
+```bash
+npm run dev:lan
+```
+
+To check other features on a phone without HTTPS, run `npm run dev:network`. It serves plain HTTP on the LAN, so voice prompts will not work through it.
+
+`dev:lan` runs `LAN_HTTPS=1 vite --host`, which serves HTTPS on the LAN. The script uses a POSIX environment variable, so on Windows set `LAN_HTTPS=1` in your shell first or run `npx vite --host` with the variable set.
+
+Vite prints a `Network:` URL such as `https://192.168.1.23:5173`. To trust the certificate on a phone:
+
+- **iPhone:** AirDrop or email `rootCA.pem` (run `mkcert -CAROOT` to find it), install it under Settings > General > VPN & Device Management, then enable full trust under Settings > General > About > Certificate Trust Settings.
+- **Android:** copy `rootCA.pem` to the phone and install it under Settings > Security > Encryption & credentials > Install a certificate > CA certificate.
+
+If your IP changes, run the `mkcert` command again with the new IP. The `frontend/certs/` folder is ignored by git. Without `LAN_HTTPS=1`, Vite serves plain HTTP on `localhost` only, as before.
+
 DuckDB holds a write lock on its database file. Flask's debug reloader starts a second process, which would compete for that lock, so use `--no-reload`. Stop any existing Flask process before starting another server against the same database file.
 
 ## Run the terminal client

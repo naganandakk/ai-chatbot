@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import threading
+from collections.abc import Sequence
 from functools import wraps
 from pathlib import Path
-from uuid import uuid4
 
 import duckdb
 
-from .models import ChatMessage, ChatSession, utc_now
+from .models import Attachment, ChatMessage, ChatSession, attachments_by_message, utc_now
 from .store import SessionStore
 
 
@@ -62,30 +64,7 @@ class DuckDBSessionStore(SessionStore):
         if row is None:
             return None
 
-        message_rows = self.connection.execute(
-            """
-            SELECT role, content, sources, model, truncated, usage, duration_ms, created_at
-            FROM chat_messages
-            WHERE session_id = ?
-            ORDER BY created_at, id
-            """,
-            [session_id],
-        ).fetchall()
-
-        messages = [
-            ChatMessage(
-                role=role,
-                content=content,
-                created_at=created_at,
-                sources=sources or "",
-                model=model or "",
-                truncated=bool(truncated),
-                usage=usage or "",
-                duration_ms=duration_ms,
-            )
-            for role, content, sources, model, truncated, usage, duration_ms, created_at
-            in message_rows
-        ]
+        messages = self._load_messages(session_id)
 
         return ChatSession(
             id=row[0],
@@ -127,6 +106,7 @@ class DuckDBSessionStore(SessionStore):
         truncated: bool = False,
         usage: str = "",
         duration_ms: int | None = None,
+        attachments: Sequence[Attachment] = (),
     ) -> ChatMessage:
         session = self._require(session_id)
         message = ChatMessage(
@@ -137,6 +117,7 @@ class DuckDBSessionStore(SessionStore):
             truncated=truncated,
             usage=usage,
             duration_ms=duration_ms,
+            attachments=list(attachments),
         )
         title = session.title
 
@@ -151,7 +132,7 @@ class DuckDBSessionStore(SessionStore):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                str(uuid4()),
+                message.id,
                 session_id,
                 message.role,
                 message.content,
@@ -163,6 +144,24 @@ class DuckDBSessionStore(SessionStore):
                 message.created_at,
             ],
         )
+        for attachment in message.attachments:
+            self.connection.execute(
+                """
+                INSERT INTO chat_attachments
+                    (id, message_id, session_id, filename, media_type, size, data, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    attachment.id,
+                    message.id,
+                    session_id,
+                    attachment.filename,
+                    attachment.media_type,
+                    attachment.size,
+                    attachment.data,
+                    utc_now(),
+                ],
+            )
         self.connection.execute(
             """
             UPDATE chat_sessions
@@ -175,14 +174,30 @@ class DuckDBSessionStore(SessionStore):
         return message
 
     @_serialized
+    def get_attachment(self, attachment_id: str) -> Attachment:
+        row = self.connection.execute(
+            "SELECT id, filename, media_type, size, data FROM chat_attachments WHERE id = ?",
+            [attachment_id],
+        ).fetchone()
+
+        if row is None:
+            raise KeyError(f"Attachment not found: {attachment_id}")
+
+        attachment_id, filename, media_type, size, data = row
+        return Attachment(
+            id=attachment_id,
+            filename=filename,
+            media_type=media_type,
+            size=size,
+            data=bytes(data),
+        )
+
+    @_serialized
     def clear(self, session_id: str) -> ChatSession:
         self._require(session_id)
         updated_at = utc_now()
 
-        self.connection.execute(
-            "DELETE FROM chat_messages WHERE session_id = ?",
-            [session_id],
-        )
+        self._delete_messages(session_id)
         self.connection.execute(
             """
             UPDATE chat_sessions
@@ -203,10 +218,7 @@ class DuckDBSessionStore(SessionStore):
     def delete(self, session_id: str) -> None:
         self._require(session_id)
 
-        self.connection.execute(
-            "DELETE FROM chat_messages WHERE session_id = ?",
-            [session_id],
-        )
+        self._delete_messages(session_id)
         self.connection.execute(
             "DELETE FROM chat_sessions WHERE id = ?",
             [session_id],
@@ -235,6 +247,56 @@ class DuckDBSessionStore(SessionStore):
     @_serialized
     def close(self) -> None:
         self.connection.close()
+
+    def _load_messages(self, session_id: str) -> list[ChatMessage]:
+        message_rows = self.connection.execute(
+            """
+            SELECT id, role, content, sources, model, truncated, usage, duration_ms, created_at
+            FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY created_at, id
+            """,
+            [session_id],
+        ).fetchall()
+
+        attachment_rows = self.connection.execute(
+            """
+            SELECT id, message_id, filename, media_type, size
+            FROM chat_attachments
+            WHERE session_id = ?
+            ORDER BY created_at, id
+            """,
+            [session_id],
+        ).fetchall()
+        attachments = attachments_by_message(attachment_rows)
+
+        return [
+            ChatMessage(
+                id=message_id,
+                role=role,
+                content=content,
+                created_at=created_at,
+                sources=sources or "",
+                model=model or "",
+                truncated=bool(truncated),
+                usage=usage or "",
+                duration_ms=duration_ms,
+                attachments=attachments.get(message_id, []),
+            )
+            for message_id, role, content, sources, model, truncated, usage, duration_ms, created_at
+            in message_rows
+        ]
+
+    def _delete_messages(self, session_id: str) -> None:
+        # Attachments reference their message, so they go first
+        self.connection.execute(
+            "DELETE FROM chat_attachments WHERE session_id = ?",
+            [session_id],
+        )
+        self.connection.execute(
+            "DELETE FROM chat_messages WHERE session_id = ?",
+            [session_id],
+        )
 
     def _initialize_schema(self) -> None:
         self.connection.execute(
@@ -277,6 +339,26 @@ class DuckDBSessionStore(SessionStore):
             """
             CREATE INDEX IF NOT EXISTS chat_messages_session_id_index
             ON chat_messages (session_id)
+            """
+        )
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_attachments (
+                id VARCHAR PRIMARY KEY,
+                message_id VARCHAR NOT NULL,
+                session_id VARCHAR NOT NULL,
+                filename VARCHAR NOT NULL,
+                media_type VARCHAR NOT NULL,
+                size BIGINT NOT NULL,
+                data BLOB NOT NULL,
+                created_at VARCHAR NOT NULL
+            )
+            """
+        )
+        self.connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS chat_attachments_session_id_index
+            ON chat_attachments (session_id)
             """
         )
 

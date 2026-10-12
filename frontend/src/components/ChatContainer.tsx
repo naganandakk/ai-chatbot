@@ -9,6 +9,7 @@ import type { Message } from "../api";
 import CopyContentBtn from './CopyContentBtn';
 import CopyMessageBtn from './CopyMessageBtn';
 import CopyResponseBtn from './CopyResponseBtn';
+import MessageAttachments from './MessageAttachments';
 import { useAppContext } from "../Context";
 import SourcesBtn from "./SourcesBtn";
 import MoreOptionsBtn from './MoreOptionsBtn';
@@ -249,6 +250,9 @@ const ChatContainer = () => {
             <div
               onClick={msg.role === 'user' ? () => toggleCopyable(idx) : undefined}
               className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user' ? 'max-w-[100%] bg-[#f0f4f9] dark:bg-[#2b2d31] text-[#202124] dark:text-[#e3e3e3] rounded-tr-none cursor-pointer' : 'w-full rounded-tl-none'}`}>
+              {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
+                <MessageAttachments attachments={msg.attachments} />
+              )}
               <div className={`${msg.role === 'user' ? 'whitespace-pre-wrap ' : ''}[&>:first-child]:mt-0 [&>:last-child]:mb-0`} id={`response-${idx}`}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                   {msg.content}

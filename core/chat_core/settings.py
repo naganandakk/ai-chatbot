@@ -62,17 +62,21 @@ class Settings:
 
 
 def _max_tokens_from_env() -> int:
-    raw = os.getenv("MAX_TOKENS", "").strip()
+    return positive_int_from_env("MAX_TOKENS", DEFAULT_MAX_TOKENS)
+
+
+def positive_int_from_env(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
 
     if not raw:
-        return DEFAULT_MAX_TOKENS
+        return default
 
     try:
         value = int(raw)
     except ValueError:
-        raise RuntimeError(f"MAX_TOKENS must be a whole number, got {raw!r}") from None
+        raise RuntimeError(f"{name} must be a whole number, got {raw!r}") from None
 
     if value <= 0:
-        raise RuntimeError(f"MAX_TOKENS must be greater than zero, got {value}")
+        raise RuntimeError(f"{name} must be greater than zero, got {value}")
 
     return value

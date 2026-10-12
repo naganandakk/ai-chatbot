@@ -4,6 +4,7 @@ import psycopg
 import pytest
 
 from core.chat_core.duckdb_store import DuckDBSessionStore
+from core.chat_core.models import Attachment
 from core.chat_core.postgres_store import PostgresSessionStore
 from core.chat_core.store import InMemorySessionStore, SessionStore
 
@@ -30,7 +31,7 @@ def store(request):
     if request.param == "postgres":
         store = PostgresSessionStore(TEST_DATABASE_URL)
         with psycopg.connect(TEST_DATABASE_URL, autocommit=True) as connection:
-            connection.execute("TRUNCATE chat_messages, chat_sessions")
+            connection.execute("TRUNCATE chat_attachments, chat_messages, chat_sessions")
 
         yield store
         store.close()
@@ -145,3 +146,43 @@ def test_duration_is_saved_with_assistant_message(store):
     store.add_message(session.id, "assistant", "Hello", duration_ms=1234)
 
     assert store.get(session.id).messages[1].duration_ms == 1234
+
+
+def test_attachments_are_saved_with_their_message(store):
+    session = store.create()
+    attachment = Attachment(
+        filename="notes.pdf", media_type="application/pdf", size=4, data=b"%PDF"
+    )
+
+    store.add_message(session.id, "user", "Read this", attachments=[attachment])
+
+    saved = store.get(session.id).messages[0]
+    assert [(a.id, a.filename, a.media_type, a.size) for a in saved.attachments] == [
+        (attachment.id, "notes.pdf", "application/pdf", 4)
+    ]
+    # Session loads carry metadata only, never the bytes
+    assert saved.attachments[0].data == b""
+    assert store.get_attachment(attachment.id).data == b"%PDF"
+
+
+def test_unknown_attachment_raises_key_error(store):
+    with pytest.raises(KeyError):
+        store.get_attachment("missing")
+
+
+def test_clear_and_delete_remove_attachments(store):
+    session = store.create()
+    attachment = Attachment(filename="a.png", media_type="image/png", size=3, data=b"abc")
+    store.add_message(session.id, "user", "Look", attachments=[attachment])
+
+    store.clear(session.id)
+
+    with pytest.raises(KeyError):
+        store.get_attachment(attachment.id)
+
+    second = Attachment(filename="b.png", media_type="image/png", size=3, data=b"xyz")
+    store.add_message(session.id, "user", "Again", attachments=[second])
+    store.delete(session.id)
+
+    with pytest.raises(KeyError):
+        store.get_attachment(second.id)

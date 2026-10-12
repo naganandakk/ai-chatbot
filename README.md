@@ -27,7 +27,9 @@ Composing and replies
 - Type a prompt in the input box and press Enter or the send button
 - Replies stream in as they are generated, with a loading indicator before the first text arrives
 - When the chat is scrolled away from the latest message, a down-arrow button appears above the prompt box; click it to jump to the bottom
-- Send is disabled while a reply is in progress or when the prompt is empty
+- Attach files with the paperclip button, drag them onto the prompt, or paste them. Images (PNG, JPEG, GIF, WebP), PDFs, and text or code files are accepted. Files stay with the chat, and images preview in the message
+- Attachment limits are set by `MAX_ATTACHMENT_MB` (each file, default 5), `MAX_ATTACHMENTS_PER_MESSAGE` (default 5), `MAX_ATTACHMENTS_TOTAL_MB` (all files in one prompt, default 10), and `MAX_SESSION_ATTACHMENTS_MB` (all files in one chat, default 20). The defaults fit the model APIs' per-request size limits; see `.env.example`
+- Send is disabled while a reply is in progress or when the prompt is empty and has no files
 - Empty chats show starter prompts; click one to fill the input box
 - Assistant replies render Markdown, including code blocks, tables, headings, and lists
 - Errors appear as toast notifications in the top-right corner and can be dismissed
@@ -222,6 +224,7 @@ uv run gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:5000 backend.app.wsgi:a
 
 Keep these settings in mind:
 
+- A message with files is a multipart upload. With the default limits a request can be up to about 11 MB, and the 120-second Gunicorn timeout leaves room for the upload and a slow reply.
 - With `CHAT_STORE=duckdb`, `--workers 1` is required. `backend.app.wsgi` opens the DuckDB file when it is imported, and DuckDB takes a write lock, so a second worker cannot open the same file. With `CHAT_STORE=postgres`, each worker opens its own connection pool, so more workers are safe.
 - The default worker class is `sync`, which serves one request at a time. A streaming reply holds the worker until it finishes, so other requests wait. The store serializes its DuckDB calls with a lock, so threads are safe to use. Raising `--threads` also needs `--worker-class gthread`, because the `sync` worker ignores it.
 - `--timeout 120` replaces Gunicorn's default of 30 seconds. A sync worker does not report progress while handling a request, so a slow model reply could otherwise get the worker killed. Set this to the longest reply you expect.

@@ -10,6 +10,34 @@ def utc_now() -> str:
 
 
 @dataclass
+class Attachment:
+    filename: str
+    media_type: str
+    size: int
+    # Empty when the attachment was loaded as metadata only. Bytes come from get_attachment.
+    data: bytes = b""
+    id: str = field(default_factory=lambda: str(uuid4()))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "mediaType": self.media_type,
+            "size": self.size,
+        }
+
+
+def attachments_by_message(rows) -> dict[str, list[Attachment]]:
+    # rows: (id, message_id, filename, media_type, size), in display order
+    grouped: dict[str, list[Attachment]] = {}
+    for attachment_id, message_id, filename, media_type, size in rows:
+        grouped.setdefault(message_id, []).append(
+            Attachment(id=attachment_id, filename=filename, media_type=media_type, size=size)
+        )
+    return grouped
+
+
+@dataclass
 class ChatMessage:
     role: str
     content: str
@@ -21,6 +49,8 @@ class ChatMessage:
     usage: str = ""
     # Milliseconds from sending the request to the end of the reply, None for older messages
     duration_ms: int | None = None
+    id: str = field(default_factory=lambda: str(uuid4()))
+    attachments: list[Attachment] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -32,6 +62,7 @@ class ChatMessage:
             "usage": _usage_to_dict(self.usage),
             "durationMs": self.duration_ms,
             "createdAt": self.created_at,
+            "attachments": [attachment.to_dict() for attachment in self.attachments],
         }
 
 

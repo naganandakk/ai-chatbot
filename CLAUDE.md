@@ -41,7 +41,7 @@ Always use `--no-reload` with Flask when `CHAT_STORE=duckdb`: DuckDB takes a wri
 
 The project is three layers sharing one core: a Flask API (`backend/`), a terminal client (`cli/`), and a React SPA (`frontend/`). Both entry points call the same `core/chat_core` service.
 
-**Request flow for a chat message.** Browser `streamMessage()` in `frontend/src/api.ts` POSTs to `/api/sessions/<id>/messages`. `backend/app/__init__.py:create_app` builds a generator that iterates `ChatService.stream_reply()` and frames each chunk as Server-Sent Events (`event: delta`, `event: done`, `event: error`). The frontend parses these frames by splitting on `\n\n`, so any change to the SSE format must be made in both files.
+**Request flow for a chat message.** Browser `streamMessage()` in `frontend/src/api.ts` POSTs to `/api/sessions/<id>/messages`. `backend/app/__init__.py:create_app` builds a generator that iterates `ChatService.stream_reply()` and frames each chunk as Server-Sent Events (`event: delta`, `event: done`, `event: error`). The frontend parses these frames by splitting on `\n\n`, so any change to the SSE format must be made in both files. Messages with files are sent as `multipart/form-data` (`message`, `model`, repeated `files`); text-only messages stay JSON. `MAX_CONTENT_LENGTH` is set from the attachment limits, so an oversized upload gets a JSON 413 before it is read. Attachment validation lives in `core/chat_core/attachments.py` and runs before anything is saved.
 
 **`ChatService.stream_reply`** (`core/chat_core/service.py`) is the core of the app:
 1. Saves the user message to the store *before* calling the model. If the model call then fails, the user message remains persisted with no assistant reply.
@@ -70,6 +70,6 @@ Two exceptions are intentional: the copied rich-text HTML in `CopyResponseBtn` c
 
 - `npm run build` passes: `tsc -b` reports no type errors and the Vite bundle builds.
 - `uv run ruff check .` passes. The CLI catches `ProviderError` (raised by any provider, including when an OpenRouter stream chunk carries an `error`) for request failures, so other exceptions propagate instead of being printed.
-- `uv run pytest` passes: 109 passed, 14 skipped without `TEST_DATABASE_URL`; 123 passed with it set to a Postgres database.
+- `uv run pytest` passes: 148 passed, 17 skipped without `TEST_DATABASE_URL`; 165 passed with it set to a Postgres database.
 - Gunicorn worker limits depend on the store. With `CHAT_STORE=duckdb`, workers must stay at 1: DuckDB takes a write lock, and each worker opens the file at import. Threads are safe there because `DuckDBSessionStore` serializes its public methods with a lock. With `CHAT_STORE=postgres`, each worker has its own connection pool, so more workers or threads are safe. Raising threads needs `--worker-class gthread`, since the `sync` worker ignores `--threads`. The production command in README still uses `--workers 1` as the baseline; raise it only after Postgres is in production.
 - The default Gunicorn timeout (30s) is too short for slow model replies, which is why the command sets `--timeout 120`.

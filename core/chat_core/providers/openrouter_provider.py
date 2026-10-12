@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Iterator
 
 import httpx
@@ -90,14 +91,17 @@ class OpenRouterProvider:
         params = {
             "model": model,
             "max_completion_tokens": self._max_tokens,
-            "messages": messages,
+            "messages": [_openrouter_message(message) for message in messages],
         }
 
         if "web_search" in tools:
             params["plugins"] = [{"id": "web"}]
             # The web plugin searches on the server and sends no event when it starts, so the
             # provider cannot cut narration out of the stream. The instruction is the only control.
-            params["messages"] = [{"role": "system", "content": WEB_SEARCH_INSTRUCTION}, *messages]
+            params["messages"] = [
+                {"role": "system", "content": WEB_SEARCH_INSTRUCTION},
+                *params["messages"],
+            ]
 
         # The citation tap appends into this list while the SDK reads the stream. It is
         # bound to this thread only, so concurrent replies keep separate citations.
@@ -168,3 +172,26 @@ class OpenRouterProvider:
             for model in models
             if not model.id.endswith(":batch")
         ]
+
+
+def _openrouter_message(message: dict) -> dict:
+    if isinstance(message["content"], str):
+        return message
+    return {**message, "content": [_openrouter_block(block) for block in message["content"]]}
+
+
+def _openrouter_block(block: dict) -> dict:
+    # OpenRouter takes files as data URLs inside OpenAI-style content parts
+    if block["type"] == "image":
+        return {"type": "image_url", "image_url": {"url": _data_url(block)}}
+    if block["type"] == "document":
+        return {
+            "type": "file",
+            "file": {"filename": block["filename"], "file_data": _data_url(block)},
+        }
+    return block
+
+
+def _data_url(block: dict) -> str:
+    encoded = base64.b64encode(block["data"]).decode("ascii")
+    return f"data:{block['media_type']};base64,{encoded}"

@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Iterator
 
 from anthropic import Anthropic, APIError
@@ -37,7 +38,7 @@ class AnthropicProvider:
         params = {
             "model": model,
             "max_tokens": self._max_tokens,
-            "messages": messages,
+            "messages": [_anthropic_message(message) for message in messages],
             "stream": True,
         }
 
@@ -108,3 +109,22 @@ class AnthropicProvider:
             ]
         except APIError as error:
             raise ProviderError(str(error)) from error
+
+
+def _anthropic_message(message: dict) -> dict:
+    if isinstance(message["content"], str):
+        return message
+    return {**message, "content": [_anthropic_block(block) for block in message["content"]]}
+
+
+def _anthropic_block(block: dict) -> dict:
+    if block["type"] in ("image", "document"):
+        return {
+            "type": block["type"],
+            "source": {
+                "type": "base64",
+                "media_type": block["media_type"],
+                "data": base64.b64encode(block["data"]).decode("ascii"),
+            },
+        }
+    return block

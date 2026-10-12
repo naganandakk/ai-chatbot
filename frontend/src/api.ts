@@ -20,6 +20,22 @@ export type SessionUsage = {
   unpricedMessages: number;
 };
 
+// id is empty for a file that is still only in the prompt, before the server has saved it
+export type Attachment = {
+  id: string;
+  filename: string;
+  mediaType: string;
+  size: number;
+};
+
+export type AttachmentLimits = {
+  maxFileBytes: number;
+  maxFiles: number;
+  maxTotalBytes: number;
+  maxSessionBytes: number;
+  acceptedExtensions: string[];
+};
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -29,6 +45,7 @@ export type Message = {
   truncated?: boolean;
   usage?: Usage | null;
   durationMs?: number | null;
+  attachments?: Attachment[];
 };
 
 export type SessionSummary = {
@@ -87,23 +104,41 @@ export class StreamError extends Error {
   }
 }
 
+export function attachmentUrl(attachmentId: string): string {
+  return `/api/attachments/${attachmentId}`;
+}
+
 async function streamMessage(
   sessionId: string,
   message: string,
   model: string,
+  files: File[],
   onDelta: (text: string) => void,
   onReset: () => void,
   onDone: (result: StreamDone) => void,
 ): Promise<void> {
-  const response = await fetch(`/api/sessions/${sessionId}/messages`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ message, model }),
-  });
+  // Files need multipart, so the browser sets the Content-Type with its boundary
+  const init: RequestInit = { method: "POST" };
+  if (files.length > 0) {
+    const form = new FormData();
+    form.append("message", message);
+    form.append("model", model);
+    files.forEach((file) => form.append("files", file, file.name));
+    init.body = form;
+  } else {
+    init.headers = { "Content-Type": "application/json" };
+    init.body = JSON.stringify({ message, model });
+  }
 
-  if (!response.ok || !response.body) {
+  const response = await fetch(`/api/sessions/${sessionId}/messages`, init);
+
+  if (!response.ok) {
+    // The server explains refusals such as an oversized upload in the body
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error ?? "Could not start the response stream");
+  }
+
+  if (!response.body) {
     throw new Error("Could not start the response stream");
   }
 
@@ -186,6 +221,9 @@ export const api = {
 
   listModels: () =>
     request<ModelList>("/models"),
+
+  getAttachmentLimits: () =>
+    request<AttachmentLimits>("/attachment-limits"),
 
   streamMessage,
 };

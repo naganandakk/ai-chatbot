@@ -17,6 +17,7 @@ def test_creates_chat_tables_in_memory():
         ).fetchall()
 
         assert tables == [
+            ("chat_attachments",),
             ("chat_messages",),
             ("chat_sessions",),
         ]

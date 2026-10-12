@@ -1,9 +1,9 @@
-from uuid import uuid4
+from collections.abc import Sequence
 
 from psycopg import Connection
 from psycopg_pool import ConnectionPool
 
-from .models import ChatMessage, ChatSession, utc_now
+from .models import Attachment, ChatMessage, ChatSession, attachments_by_message, utc_now
 from .store import SessionStore
 
 # Timestamps stay as ISO-8601 text, matching the DuckDB store and the API's string dates.
@@ -33,6 +33,22 @@ SCHEMA_STATEMENTS = [
     """
     CREATE INDEX IF NOT EXISTS chat_messages_session_id_index
     ON chat_messages (session_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS chat_attachments (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL REFERENCES chat_messages (id),
+        session_id TEXT NOT NULL REFERENCES chat_sessions (id),
+        filename TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        data BYTEA NOT NULL,
+        created_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS chat_attachments_session_id_index
+    ON chat_attachments (session_id)
     """,
 ]
 
@@ -92,6 +108,7 @@ class PostgresSessionStore(SessionStore):
         truncated: bool = False,
         usage: str = "",
         duration_ms: int | None = None,
+        attachments: Sequence[Attachment] = (),
     ) -> ChatMessage:
         message = ChatMessage(
             role=role,
@@ -101,6 +118,7 @@ class PostgresSessionStore(SessionStore):
             truncated=truncated,
             usage=usage,
             duration_ms=duration_ms,
+            attachments=list(attachments),
         )
 
         with self._pool.connection() as connection:
@@ -117,7 +135,7 @@ class PostgresSessionStore(SessionStore):
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid4()),
+                    message.id,
                     session_id,
                     message.role,
                     message.content,
@@ -129,6 +147,24 @@ class PostgresSessionStore(SessionStore):
                     message.created_at,
                 ],
             )
+            for attachment in message.attachments:
+                connection.execute(
+                    """
+                    INSERT INTO chat_attachments
+                        (id, message_id, session_id, filename, media_type, size, data, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    [
+                        attachment.id,
+                        message.id,
+                        session_id,
+                        attachment.filename,
+                        attachment.media_type,
+                        attachment.size,
+                        attachment.data,
+                        utc_now(),
+                    ],
+                )
             connection.execute(
                 "UPDATE chat_sessions SET title = %s, updated_at = %s WHERE id = %s",
                 [title, utc_now(), session_id],
@@ -136,14 +172,31 @@ class PostgresSessionStore(SessionStore):
 
         return message
 
+    def get_attachment(self, attachment_id: str) -> Attachment:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                "SELECT id, filename, media_type, size, data FROM chat_attachments WHERE id = %s",
+                [attachment_id],
+            ).fetchone()
+
+        if row is None:
+            raise KeyError(f"Attachment not found: {attachment_id}")
+
+        attachment_id, filename, media_type, size, data = row
+        return Attachment(
+            id=attachment_id,
+            filename=filename,
+            media_type=media_type,
+            size=size,
+            # psycopg returns bytea as a memoryview
+            data=bytes(data),
+        )
+
     def clear(self, session_id: str) -> ChatSession:
         with self._pool.connection() as connection:
             self._lock_session(connection, session_id)
+            self._delete_messages(connection, session_id)
 
-            connection.execute(
-                "DELETE FROM chat_messages WHERE session_id = %s",
-                [session_id],
-            )
             connection.execute(
                 """
                 UPDATE chat_sessions
@@ -158,11 +211,7 @@ class PostgresSessionStore(SessionStore):
     def delete(self, session_id: str) -> None:
         with self._pool.connection() as connection:
             self._lock_session(connection, session_id)
-
-            connection.execute(
-                "DELETE FROM chat_messages WHERE session_id = %s",
-                [session_id],
-            )
+            self._delete_messages(connection, session_id)
             connection.execute("DELETE FROM chat_sessions WHERE id = %s", [session_id])
 
     def update(self, session_id: str, title: str) -> ChatSession:
@@ -195,6 +244,11 @@ class PostgresSessionStore(SessionStore):
 
         return row[0]
 
+    def _delete_messages(self, connection: Connection, session_id: str) -> None:
+        # Attachments reference their message, so they go first
+        connection.execute("DELETE FROM chat_attachments WHERE session_id = %s", [session_id])
+        connection.execute("DELETE FROM chat_messages WHERE session_id = %s", [session_id])
+
     def _load(self, connection: Connection, session_id: str) -> ChatSession | None:
         row = connection.execute(
             """
@@ -210,7 +264,7 @@ class PostgresSessionStore(SessionStore):
 
         message_rows = connection.execute(
             """
-            SELECT role, content, sources, model, truncated, usage, duration_ms, created_at
+            SELECT id, role, content, sources, model, truncated, usage, duration_ms, created_at
             FROM chat_messages
             WHERE session_id = %s
             ORDER BY created_at, id
@@ -218,8 +272,20 @@ class PostgresSessionStore(SessionStore):
             [session_id],
         ).fetchall()
 
+        attachment_rows = connection.execute(
+            """
+            SELECT id, message_id, filename, media_type, size
+            FROM chat_attachments
+            WHERE session_id = %s
+            ORDER BY created_at, id
+            """,
+            [session_id],
+        ).fetchall()
+        attachments = attachments_by_message(attachment_rows)
+
         messages = [
             ChatMessage(
+                id=message_id,
                 role=role,
                 content=content,
                 created_at=created_at,
@@ -228,8 +294,9 @@ class PostgresSessionStore(SessionStore):
                 truncated=bool(truncated),
                 usage=usage or "",
                 duration_ms=duration_ms,
+                attachments=attachments.get(message_id, []),
             )
-            for role, content, sources, model, truncated, usage, duration_ms, created_at
+            for message_id, role, content, sources, model, truncated, usage, duration_ms, created_at
             in message_rows
         ]
 

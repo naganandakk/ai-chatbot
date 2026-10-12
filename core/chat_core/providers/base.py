@@ -62,7 +62,10 @@ class ModelInfo:
 class ModelProvider(Protocol):
     """Streams one model reply as normalized events.
 
-    `messages` is the full conversation as `{"role", "content"}` dicts. `tools` holds
+    `messages` is the full conversation as `{"role", "content"}` dicts. A message with files
+    has a list of content blocks instead of a string: `{"type": "text", "text"}`, or
+    `{"type": "image" | "document", "filename", "media_type", "data": bytes}`. Each provider
+    converts those to its own wire format. `tools` holds
     tool names from `TOOLS_ENABLED`; each provider maps the names it understands and
     ignores the rest. Implementations must be safe to call from several threads at once.
     """

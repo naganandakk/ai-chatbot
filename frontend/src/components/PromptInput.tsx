@@ -2,6 +2,7 @@ import {
   Send
 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, ChatSession, Message, SessionSummary, StreamError } from "../api";
 import { useAppContext } from "../Context";
 import { useIsDesktop } from "../useIsDesktop";
@@ -20,6 +21,7 @@ const PromptInput = () => {
     promptFocusRequest,
     notifyError
   } = useAppContext();
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const isDesktop = useIsDesktop();
   const voice = useVoiceInput({
@@ -81,6 +83,7 @@ const PromptInput = () => {
     setIsGenerating(true);
 
     try {
+      const isNewSession = !activeSession;
       const session: ChatSession = activeSession ?? (await api.createSession());
 
       const userMessage: Message = {
@@ -104,6 +107,10 @@ const PromptInput = () => {
         ...session,
         messages: [...session.messages, userMessage, assistantMessage],
       });
+      // The URL follows the chat once it exists, so a refresh reopens it
+      if (isNewSession) {
+        navigate(`/sessions/${session.id}`);
+      }
 
       await api.streamMessage(
         session.id,

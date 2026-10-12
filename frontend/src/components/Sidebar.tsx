@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import {
   Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Moon, Sun
 } from 'lucide-react';
-import { api, ChatSession, SessionSummary } from "../api";
+import { useNavigate } from "react-router-dom";
+import { api, SessionSummary } from "../api";
 import { useAppContext } from "../Context";
 import ConfirmModal from "./ConfirmModal";
 import RenameModal from "./RenameModal";
@@ -11,8 +12,7 @@ import { useSessionActions } from "../useSessionActions";
 const Sidebar = () => {
   const {
     sidebarOpen, setSidebarOpen,
-    activeSession, setActiveSession,
-    setIsLoadingSession,
+    activeSession,
     requestPromptFocus,
     sessions, setSessions,
     notifyError, notifySuccess,
@@ -27,42 +27,13 @@ const Sidebar = () => {
   const sidebarRef = useRef<HTMLElement>(null);
   const [pendingConfirm, setPendingConfirm] = useState<{ action: 'delete' | 'clear'; sessionId: string } | null>(null);
   const pendingConfirmSession = sessions.find(session => session.id === pendingConfirm?.sessionId);
-  // Only the latest session load may update the chat, so a slow earlier response can't overwrite a newer one
-  const latestLoadRequest = useRef(0);
-
-  async function loadSession(sessionId: string, fallbackError: string) {
-    const requestId = ++latestLoadRequest.current;
-    const isLatest = () => requestId === latestLoadRequest.current;
-
-    setIsLoadingSession(true);
-    try {
-      const session = await api.getSession(sessionId);
-      if (isLatest()) {
-        setActiveSession(session);
-      }
-    } catch (requestError) {
-      if (isLatest()) {
-        notifyError(requestError instanceof Error ? requestError.message : fallbackError);
-      }
-    } finally {
-      if (isLatest()) {
-        setIsLoadingSession(false);
-      }
-    }
-  }
-
-  function cancelSessionLoad() {
-    latestLoadRequest.current++;
-    setIsLoadingSession(false);
-  }
+  // Opening a chat is done by the URL, see SessionSync
+  const navigate = useNavigate();
 
   async function refreshSessions () {
     try {
       const sessionList = await api.listSessions()
       setSessions(sessionList);
-      if (sessionList.length > 0) {
-        await loadSession(sessionList[0].id, "Could not load sessions");
-      }
     } catch (requestError) {
       notifyError(
         requestError instanceof Error
@@ -72,7 +43,7 @@ const Sidebar = () => {
     }
   }
 
-  async function openSession(sessionId: string) {
+  function openSession(sessionId: string) {
     if (isGenerating) {
       return;
     }
@@ -80,7 +51,7 @@ const Sidebar = () => {
       return;
     }
 
-    await loadSession(sessionId, "Could not open the session");
+    navigate(`/sessions/${sessionId}`);
   }
 
   function openConfirm(e: React.MouseEvent, action: 'delete' | 'clear', sessionId: string) {
@@ -178,8 +149,7 @@ const Sidebar = () => {
           {sidebarOpen && (
             <div onClick={() => {
               if (window.innerWidth < 768) setSidebarOpen(false);
-              cancelSessionLoad();
-              setActiveSession(null);
+              navigate('/');
               requestPromptFocus();
             }} className={`text-sm flex items-center gap-2 w-full rounded-full cursor-pointer font-medium py-1 px-3 transition-all ${!activeSession ? 'bg-[#d3e3fd] dark:bg-[#004a77] text-[#041e49] dark:text-[#c2e7ff] font-bold' : 'font-medium hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] text-[#3c4043] dark:text-[#c4c7c5]'}`}>
               <SquarePen size="16"/>

@@ -3,6 +3,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown, { type Components } from "react-markdown";
+import { useNavigate } from "react-router-dom";
 import remarkGfm from "remark-gfm";
 import type { Message } from "../api";
 import CopyContentBtn from './CopyContentBtn';
@@ -135,9 +136,9 @@ const ChatContainer = () => {
     isLoadingSession,
     isGenerating,
     setInputMessage,
-    setActiveSession,
     requestPromptFocus,
   } = useAppContext();
+  const navigate = useNavigate();
   // Index of the user message whose copy button is revealed by a click
   const [copyableIdx, setCopyableIdx] = useState<number | null>(null);
   const hideCopyable = useCallback(() => setCopyableIdx(null), []);
@@ -301,7 +302,7 @@ const ChatContainer = () => {
         <button
           type="button"
           onClick={() => {
-            setActiveSession(null);
+            navigate("/");
             requestPromptFocus();
           }}
           className="rounded-full border border-amber-300 dark:border-amber-700 px-3 py-1 font-medium hover:bg-amber-50 dark:hover:bg-amber-950 transition-all"

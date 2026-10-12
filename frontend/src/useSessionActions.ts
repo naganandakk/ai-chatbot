@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { useAppContext } from "./Context";
 
@@ -10,6 +11,7 @@ export const useSessionActions = () => {
     isGenerating,
     notifyError, notifySuccess,
   } = useAppContext();
+  const navigate = useNavigate();
 
   const deleteChat = async (sessionId: string) => {
     if (isGenerating) {
@@ -18,7 +20,7 @@ export const useSessionActions = () => {
 
     try {
       await api.deleteSession(sessionId);
-      setActiveSession(null);
+      navigate("/");
       setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
       notifySuccess("Chat deleted");
     } catch (requestError) {

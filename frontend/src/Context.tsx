@@ -25,6 +25,19 @@ function readStoredModel(): string {
   }
 }
 
+// Keeps the tools the user switched on, so a page refresh keeps them. Tools start off.
+const TOOLS_STORAGE_KEY = "ai-chat.tools";
+
+function readStoredTools(): string[] {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(TOOLS_STORAGE_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((tool) => typeof tool === "string") : [];
+  } catch {
+    // Storage can be blocked, or hold something unreadable
+    return [];
+  }
+}
+
 type Theme = "light" | "dark";
 
 // Keeps the theme the user picked, so a page refresh keeps it
@@ -62,6 +75,8 @@ interface AppContextValue {
   setInputMessage: Setter<string>;
   selectedModel: string;
   selectModel: (modelId: string) => void;
+  selectedTools: string[];
+  selectTools: (toolIds: string[]) => void;
   theme: Theme;
   toggleTheme: () => void;
   promptFocusRequest: number;
@@ -105,6 +120,15 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
     setSelectedModel(modelId);
     try {
       window.localStorage.setItem(MODEL_STORAGE_KEY, modelId);
+    } catch {
+      // The selection still applies for this page load if storage is unavailable
+    }
+  }, []);
+  const [selectedTools, setSelectedTools] = useState<string[]>(readStoredTools);
+  const selectTools = useCallback((toolIds: string[]) => {
+    setSelectedTools(toolIds);
+    try {
+      window.localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify(toolIds));
     } catch {
       // The selection still applies for this page load if storage is unavailable
     }
@@ -211,6 +235,7 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       editingChatId, setEditingChatId,
       inputMessage, setInputMessage,
       selectedModel, selectModel,
+      selectedTools, selectTools,
       theme, toggleTheme,
       promptFocusRequest, requestPromptFocus,
       notifications, notifyError, notifySuccess, dismissNotification,

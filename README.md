@@ -236,7 +236,7 @@ npm run build
 
 Deploy `frontend/dist/` to a static host, CDN, or reverse proxy. Configure it to serve the frontend and route `/api` requests to the Flask service.
 
-Set `GOOGLE_CLIENT_ID`, `JWT_SECRET`, `KEY_ENCRYPTION_KEYS`, the storage variables below, and optionally `TOOLS_ENABLED` through your hosting platform's secret manager. Do not upload a `.env` file to production. Provider keys are supplied by users in the app, not by the server.
+Set `GOOGLE_CLIENT_ID`, `JWT_SECRET`, `KEY_ENCRYPTION_KEYS`, and the storage variables below through your hosting platform's secret manager. Do not upload a `.env` file to production. Provider keys are supplied by users in the app, not by the server.
 
 Sign-in cookies are `Secure`, so serve the app over HTTPS. The API uses same-origin requests only, so no CORS origins need configuring.
 

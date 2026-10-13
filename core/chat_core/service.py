@@ -30,6 +30,7 @@ from .providers import (
 )
 from .settings import DEFAULT_MAX_TOKENS, Settings, default_model, positive_int_from_env
 from .store import SessionStore
+from .tools import checked_tools
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,6 @@ class ChatService:
         store: SessionStore,
         provider: ModelProvider | None = None,
         settings: Settings | None = None,
-        tools_enabled: list[str] | None = None,
         attachment_limits: AttachmentLimits | None = None,
         accounts: AccountStore | None = None,
         key_vault: KeyVault | None = None,
@@ -57,7 +57,6 @@ class ChatService:
         self.store = store
         self.provider = provider
         self.settings = settings
-        self.tools_enabled = tools_enabled if tools_enabled else []
         self.attachment_limits = attachment_limits or AttachmentLimits()
         self.accounts = accounts
         self.key_vault = key_vault
@@ -73,6 +72,7 @@ class ChatService:
         model: str | None = None,
         files: Sequence[UploadedFile] = (),
         provider_name: str | None = None,
+        tools: Sequence[str] = (),
     ) -> Generator[str | ReplyReset, None, ChatMessage]:
         # Yields text deltas, and a ReplyReset when earlier text is discarded. Returns the
         # saved assistant message once the reply ends. Files are optional, so a message can
@@ -80,6 +80,8 @@ class ChatService:
         message = prompt.strip()
         if not message and not files:
             raise ValueError("Message cannot be empty")
+        # Checked before anything is saved, so a bad tool name leaves no unanswered message
+        enabled_tools = checked_tools(tools)
 
         # Resolved before anything is saved, so a missing key leaves no unanswered message
         default_model_name, provider = self._resolve(user_id, provider_name)
@@ -111,7 +113,7 @@ class ChatService:
         for event in provider.stream(
             model=model,
             messages=conversation,
-            tools=self.tools_enabled,
+            tools=enabled_tools,
         ):
             if isinstance(event, TextDelta):
                 chunks.append(event.text)

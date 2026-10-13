@@ -9,6 +9,7 @@ import { useAppContext } from "../Context";
 import { useIsDesktop } from "../useIsDesktop";
 import { useVoiceInput } from "../voiceInput";
 import ModelPicker from "./ModelPicker";
+import ToolsMenu from "./ToolsMenu";
 import VoiceInputBtn from "./VoiceInputBtn";
 
 const PromptInput = () => {
@@ -18,7 +19,7 @@ const PromptInput = () => {
     isLoadingSession,
     isGenerating, setIsGenerating,
     inputMessage, setInputMessage,
-    selectedModel,
+    selectedModel, selectedTools,
     promptFocusRequest,
     notifyError
   } = useAppContext();
@@ -155,6 +156,7 @@ const PromptInput = () => {
         session.id,
         userText,
         selectedModel,
+        selectedTools,
         sentFiles,
         (chunk) => {
           setActiveSession((currentSession) => {
@@ -277,6 +279,7 @@ const PromptInput = () => {
             addFiles(e.clipboardData.files);
           }
         }} placeholder={isLoadingSession ? "Loading chat..." : voice.isListening ? "Listening... speak your prompt" : "Enter a prompt here..."} className="min-w-0 w-full flex-1 bg-transparent py-4 pl-6 pr-2 text-base md:text-sm text-[#202124] dark:text-[#e3e3e3] focus:outline-none" />
+        <ToolsMenu />
         {isDesktop && <ModelPicker />}
         <button
           type="button"

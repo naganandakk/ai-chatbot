@@ -69,8 +69,8 @@ class ModelProvider(Protocol):
     has a list of content blocks instead of a string: `{"type": "text", "text"}`, or
     `{"type": "image" | "document", "filename", "media_type", "data": bytes}`. Each provider
     converts those to its own wire format. `tools` holds
-    tool names from `TOOLS_ENABLED`; each provider maps the names it understands and
-    ignores the rest. Implementations must be safe to call from several threads at once.
+    the tool ids the user switched on for this message (see `tools.py`); each provider maps
+    the ids it understands and ignores the rest. Implementations must be safe to call from several threads at once.
     """
 
     def stream(

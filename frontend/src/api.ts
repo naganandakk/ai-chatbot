@@ -75,6 +75,13 @@ export type ModelList = {
   models: ModelOption[];
 };
 
+// A tool the user can switch on for a message. The server offers the list and it is off by default
+export type Tool = {
+  id: string;
+  name: string;
+  description: string;
+};
+
 export type ConfirmationMessage = {
   message: string
 }
@@ -186,6 +193,7 @@ async function streamMessage(
   sessionId: string,
   message: string,
   model: string,
+  tools: string[],
   files: File[],
   onDelta: (text: string) => void,
   onReset: () => void,
@@ -197,11 +205,12 @@ async function streamMessage(
     const form = new FormData();
     form.append("message", message);
     form.append("model", model);
+    tools.forEach((tool) => form.append("tools", tool));
     files.forEach((file) => form.append("files", file, file.name));
     init.body = form;
   } else {
     init.headers = { "Content-Type": "application/json" };
-    init.body = JSON.stringify({ message, model });
+    init.body = JSON.stringify({ message, model, tools });
   }
 
   const response = await apiFetch(`/api/sessions/${sessionId}/messages`, init);
@@ -318,6 +327,9 @@ export const api = {
 
   listModels: () =>
     request<ModelList>("/models"),
+
+  listTools: () =>
+    request<Tool[]>("/tools"),
 
   getAttachmentLimits: () =>
     request<AttachmentLimits>("/attachment-limits"),

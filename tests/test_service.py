@@ -60,12 +60,11 @@ def anthropic_settings() -> Settings:
     return Settings(provider="anthropic", api_key="test-key", model="test-model")
 
 
-def anthropic_service(store, client, tools_enabled=None) -> ChatService:
+def anthropic_service(store, client) -> ChatService:
     return ChatService(
         store,
         provider=AnthropicProvider(api_key="test-key", client=client),
         settings=anthropic_settings(),
-        tools_enabled=tools_enabled,
     )
 
 
@@ -173,10 +172,9 @@ def test_service_saves_events_from_any_provider():
         store,
         provider=provider,
         settings=anthropic_settings(),
-        tools_enabled=["web_search"],
     )
 
-    chunks = list(service.stream_reply(USER_ID, session.id, "Hello"))
+    chunks = list(service.stream_reply(USER_ID, session.id, "Hello", tools=["web_search"]))
 
     assistant = store.get(USER_ID, session.id).messages[1]
     assert chunks == ["Hi", "!"]
@@ -197,9 +195,9 @@ def test_anthropic_maps_enabled_tools_to_server_tools():
     store = InMemorySessionStore()
     session = store.create(USER_ID)
     client = FakeClaudeClient()
-    service = anthropic_service(store, client, tools_enabled=["web_search"])
+    service = anthropic_service(store, client)
 
-    list(service.stream_reply(USER_ID, session.id, "Latest news"))
+    list(service.stream_reply(USER_ID, session.id, "Latest news", tools=["web_search"]))
 
     assert client.messages.requests[0]["tools"] == [{"type": "web_search"}]
 
@@ -234,9 +232,9 @@ def test_anthropic_narration_before_web_search_is_dropped_from_reply():
     store = InMemorySessionStore()
     session = store.create(USER_ID)
     client = SimpleNamespace(messages=SearchingMessages())
-    service = anthropic_service(store, client, tools_enabled=["web_search"])
+    service = anthropic_service(store, client)
 
-    chunks = list(service.stream_reply(USER_ID, session.id, "Weather?"))
+    chunks = list(service.stream_reply(USER_ID, session.id, "Weather?", tools=["web_search"]))
 
     assistant = store.get(USER_ID, session.id).messages[1]
     assert chunks == ["Let me search.", ReplyReset(), "It is sunny."]
@@ -309,12 +307,11 @@ def openrouter_settings() -> Settings:
     )
 
 
-def openrouter_service(store, transport, tools_enabled=None) -> ChatService:
+def openrouter_service(store, transport) -> ChatService:
     return ChatService(
         store,
         provider=OpenRouterProvider(api_key="openrouter-key", transport=transport),
         settings=openrouter_settings(),
-        tools_enabled=tools_enabled,
     )
 
 
@@ -429,9 +426,9 @@ def test_openrouter_web_search_tells_model_not_to_narrate_the_search():
     session = store.create(USER_ID)
     requests: list[dict] = []
     transport = openrouter_transport([openrouter_chunk("Sunny today.")], requests)
-    service = openrouter_service(store, transport, tools_enabled=["web_search"])
+    service = openrouter_service(store, transport)
 
-    list(service.stream_reply(USER_ID, session.id, "Weather?"))
+    list(service.stream_reply(USER_ID, session.id, "Weather?", tools=["web_search"]))
 
     system_message = requests[0]["messages"][0]
     assert system_message["role"] == "system"
@@ -444,9 +441,9 @@ def test_openrouter_web_search_tool_enables_web_plugin():
     session = store.create(USER_ID)
     requests: list[dict] = []
     transport = openrouter_transport([openrouter_chunk("Hi")], requests)
-    service = openrouter_service(store, transport, tools_enabled=["web_search"])
+    service = openrouter_service(store, transport)
 
-    list(service.stream_reply(USER_ID, session.id, "Latest news"))
+    list(service.stream_reply(USER_ID, session.id, "Latest news", tools=["web_search"]))
 
     assert requests[0]["plugins"] == [{"id": "web"}]
 
@@ -464,9 +461,9 @@ def test_openrouter_url_citations_are_saved_as_sources():
         ],
         requests,
     )
-    service = openrouter_service(store, transport, tools_enabled=["web_search"])
+    service = openrouter_service(store, transport)
 
-    list(service.stream_reply(USER_ID, session.id, "Latest Python?"))
+    list(service.stream_reply(USER_ID, session.id, "Latest Python?", tools=["web_search"]))
 
     saved_message = store.get(USER_ID, session.id).messages[1]
     assert json.loads(saved_message.sources) == [

@@ -10,7 +10,7 @@ class FakeChatService:
     def __init__(self, store: SessionStore) -> None:
         self.store = store
 
-    def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+    def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None, tools=()):
         self.store.add_message(USER_ID, session_id, "user", prompt)
         yield "Hello"
         yield " world"
@@ -72,7 +72,7 @@ def test_error_event_carries_server_session_so_client_can_reconcile():
         def __init__(self, store: SessionStore) -> None:
             self.store = store
 
-        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None, tools=()):
             self.store.add_message(USER_ID, session_id, "user", prompt)
             raise ProviderStreamError("Upstream overloaded")
             yield
@@ -120,7 +120,7 @@ def test_streaming_endpoint_passes_truncated_reply_message_to_client():
     from core.chat_core.providers import TruncatedReplyError
 
     class TruncatingChatService:
-        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None, tools=()):
             raise TruncatedReplyError()
             yield
 
@@ -141,7 +141,7 @@ def test_done_event_carries_token_usage_and_cost():
     store = InMemorySessionStore()
 
     class UsageChatService:
-        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None, tools=()):
             self.store.add_message(USER_ID, session_id, "user", prompt)
             return self.store.add_message(USER_ID,
                 session_id,

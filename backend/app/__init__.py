@@ -18,6 +18,7 @@ from core.chat_core.providers import (
 )
 from core.chat_core.service import ApiKeyRequired, ChatService
 from core.chat_core.store import InMemorySessionStore, SessionStore
+from core.chat_core.tools import TOOLS
 
 
 def create_app(
@@ -85,6 +86,10 @@ def create_app(
     @app.get("/api/attachment-limits")
     def attachment_limits():
         return jsonify(limits.to_dict())
+
+    @app.get("/api/tools")
+    def list_tools():
+        return jsonify([tool.to_dict() for tool in TOOLS])
 
     @app.get("/api/attachments/<attachment_id>")
     def get_attachment(attachment_id: str):
@@ -184,6 +189,7 @@ def create_app(
             prompt = request.form.get("message", "")
             model = request.form.get("model")
             provider_name = request.form.get("provider")
+            tools = request.form.getlist("tools")
             files = [
                 UploadedFile(file.filename or "", file.read())
                 for file in request.files.getlist("files")
@@ -193,6 +199,7 @@ def create_app(
             prompt = payload.get("message", "")
             model = payload.get("model")
             provider_name = payload.get("provider")
+            tools = payload.get("tools") or []
             files = []
 
         def session_state() -> dict | None:
@@ -202,7 +209,7 @@ def create_app(
         def generate():
             try:
                 chunks = app.config["CHAT_SERVICE"].stream_reply(
-                    user_id, session_id, prompt, model, files, provider_name
+                    user_id, session_id, prompt, model, files, provider_name, tools=tools
                 )
                 while True:
                     try:

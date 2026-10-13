@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -11,17 +10,11 @@ from . import create_app
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
-tools_enabled_str = os.getenv("TOOLS_ENABLED", "").strip()
-tools_enabled = []
-if tools_enabled_str:
-    tools_enabled = tools_enabled_str.split(",")
-
 store = create_store()
 key_vault = KeyVault.from_env()
 # Each user replies with their own saved API key, so there is no server-wide key to warm up
 chat_service = ChatService(
     store=store,
-    tools_enabled=tools_enabled,
     accounts=store,
     key_vault=key_vault,
 )

@@ -28,6 +28,8 @@ def test_session_total_sums_replies_and_ignores_messages_without_usage():
         "costUsd": 1.75,
         "pricedMessages": 2,
         "unpricedMessages": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
     }
 
 
@@ -56,6 +58,8 @@ def test_empty_session_has_zero_totals():
         "costUsd": None,
         "pricedMessages": 0,
         "unpricedMessages": 0,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
     }
 
 
@@ -64,3 +68,38 @@ def test_session_dict_includes_usage_only_with_messages():
 
     assert session.to_dict()["usage"]["costUsd"] == 0.5
     assert "usage" not in session.to_dict(include_messages=False)
+
+
+def reply_with_cache(input_tokens: int, cache_read: int, cache_write: int) -> ChatMessage:
+    usage = json.dumps({
+        "input_tokens": input_tokens,
+        "output_tokens": 10,
+        "cost_usd": 0.1,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": cache_write,
+    })
+    return ChatMessage("assistant", "Hi", usage=usage)
+
+
+def test_session_total_sums_cache_reads_and_writes():
+    summary = summarize_usage([
+        reply_with_cache(1000, cache_read=0, cache_write=800),
+        reply_with_cache(1200, cache_read=800, cache_write=50),
+    ]).to_dict()
+
+    assert summary["cacheReadTokens"] == 800
+    assert summary["cacheWriteTokens"] == 850
+
+
+def test_replies_saved_before_cache_tracking_count_as_zero_cache():
+    message = reply(100, 20, 0.5)
+
+    assert message.to_dict()["usage"]["cacheReadTokens"] == 0
+    assert summarize_usage([message]).to_dict()["cacheReadTokens"] == 0
+
+
+def test_message_usage_exposes_cache_counts():
+    message = reply_with_cache(1000, cache_read=600, cache_write=0)
+
+    assert message.to_dict()["usage"]["cacheReadTokens"] == 600
+    assert message.to_dict()["usage"]["cacheWriteTokens"] == 0

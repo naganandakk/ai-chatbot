@@ -48,6 +48,9 @@ class Usage:
     input_tokens: int
     output_tokens: int
     cost_usd: float | None
+    # Part of input_tokens: tokens served from the prompt cache, and tokens written to it
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
 
 
 ProviderEvent = TextDelta | Citation | ReplyTruncated | ReplyReset | Usage

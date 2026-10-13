@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../Context';
-import { formatCost, formatCostShort } from '../format';
+import { formatCacheHit, formatCost, formatCostShort } from '../format';
 
 // Shows the active session's token and cost totals, with a breakdown on click
 const SessionUsage = () => {
@@ -35,6 +35,7 @@ const SessionUsage = () => {
   const totalTokens = usage.inputTokens + usage.outputTokens;
   const costLabel = usage.costUsd === null ? null : formatCostShort(usage.costUsd);
   const tokenLabel = `${totalTokens.toLocaleString()} tokens`;
+  const cacheHit = formatCacheHit(usage.cacheReadTokens, usage.inputTokens);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -60,6 +61,15 @@ const SessionUsage = () => {
             <div>Input tokens: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.inputTokens.toLocaleString()}</span></div>
             <div>Output tokens: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.outputTokens.toLocaleString()}</span></div>
             <div>Cost: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.costUsd === null ? 'Unavailable' : formatCost(usage.costUsd)}</span></div>
+            {usage.cacheReadTokens > 0 && (
+              <div>
+                Cache hits: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.cacheReadTokens.toLocaleString()}</span>
+                {cacheHit && <span> ({cacheHit} of input)</span>}
+              </div>
+            )}
+            {usage.cacheWriteTokens > 0 && (
+              <div>Cache writes: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.cacheWriteTokens.toLocaleString()}</span></div>
+            )}
           </div>
           {usage.unpricedMessages > 0 && (
             <div className="mt-1 text-amber-700 dark:text-amber-400">

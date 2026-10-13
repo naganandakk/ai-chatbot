@@ -75,6 +75,9 @@ def _usage_to_dict(raw: str) -> dict[str, Any] | None:
         "inputTokens": usage["input_tokens"],
         "outputTokens": usage["output_tokens"],
         "costUsd": usage["cost_usd"],
+        # Replies saved before caching was tracked have no cache counts, so they read as zero
+        "cacheReadTokens": usage.get("cache_read_tokens", 0),
+        "cacheWriteTokens": usage.get("cache_write_tokens", 0),
     }
 
 
@@ -86,6 +89,8 @@ class UsageSummary:
     cost_usd: float | None = None
     priced_messages: int = 0
     unpriced_messages: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -94,6 +99,8 @@ class UsageSummary:
             "costUsd": self.cost_usd,
             "pricedMessages": self.priced_messages,
             "unpricedMessages": self.unpriced_messages,
+            "cacheReadTokens": self.cache_read_tokens,
+            "cacheWriteTokens": self.cache_write_tokens,
         }
 
 
@@ -101,6 +108,7 @@ def summarize_usage(messages: list[ChatMessage]) -> UsageSummary:
     # Only replies carry usage. The cost is summed over the priced replies, and the unpriced
     # count tells the client the total is partial.
     input_tokens = output_tokens = priced = unpriced = 0
+    cache_read = cache_write = 0
     cost_usd = 0.0
 
     for message in messages:
@@ -110,6 +118,8 @@ def summarize_usage(messages: list[ChatMessage]) -> UsageSummary:
         usage = json.loads(message.usage)
         input_tokens += usage["input_tokens"]
         output_tokens += usage["output_tokens"]
+        cache_read += usage.get("cache_read_tokens", 0)
+        cache_write += usage.get("cache_write_tokens", 0)
         if usage["cost_usd"] is None:
             unpriced += 1
         else:
@@ -122,6 +132,8 @@ def summarize_usage(messages: list[ChatMessage]) -> UsageSummary:
         cost_usd=cost_usd if priced else None,
         priced_messages=priced,
         unpriced_messages=unpriced,
+        cache_read_tokens=cache_read,
+        cache_write_tokens=cache_write,
     )
 
 

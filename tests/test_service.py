@@ -724,6 +724,8 @@ def test_anthropic_reply_reports_tokens_and_cost():
         "inputTokens": 1500,
         "outputTokens": 50,
         "costUsd": pytest.approx(0.02303),
+        "cacheReadTokens": 300,
+        "cacheWriteTokens": 200,
     }
 
 
@@ -736,7 +738,13 @@ def test_anthropic_unknown_model_reports_tokens_without_cost():
     list(service.stream_reply(USER_ID, session.id, "Hello"))
 
     usage = store.get(USER_ID, session.id).to_dict()["messages"][1]["usage"]
-    assert usage == {"inputTokens": 12, "outputTokens": 3, "costUsd": None}
+    assert usage == {
+        "inputTokens": 12,
+        "outputTokens": 3,
+        "costUsd": None,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+    }
 
 
 def test_openrouter_reply_reports_cost_from_final_chunk():
@@ -762,7 +770,13 @@ def test_openrouter_reply_reports_cost_from_final_chunk():
     assert "".join(service.stream_reply(USER_ID, session.id, "Hello")) == "Hi"
 
     usage = store.get(USER_ID, session.id).to_dict()["messages"][1]["usage"]
-    assert usage == {"inputTokens": 12, "outputTokens": 5, "costUsd": 0.00042}
+    assert usage == {
+        "inputTokens": 12,
+        "outputTokens": 5,
+        "costUsd": 0.00042,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+    }
 
 
 def test_usage_survives_a_reply_reset_because_the_tokens_were_billed():
@@ -780,7 +794,13 @@ def test_usage_survives_a_reply_reset_because_the_tokens_were_billed():
 
     assistant = store.get(USER_ID, session.id).messages[1]
     assert assistant.content == "Answer"
-    assert assistant.to_dict()["usage"] == {"inputTokens": 10, "outputTokens": 4, "costUsd": 0.5}
+    assert assistant.to_dict()["usage"] == {
+        "inputTokens": 10,
+        "outputTokens": 4,
+        "costUsd": 0.5,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+    }
 
 
 def test_reply_without_usage_event_saves_no_usage():

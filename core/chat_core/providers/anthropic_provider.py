@@ -15,6 +15,7 @@ from .base import (
     TruncatedReplyError,
     Usage,
 )
+from .caching import CachePolicy
 from .pricing import anthropic_cost
 
 ANTHROPIC_API_URL = "https://api.anthropic.com"
@@ -35,6 +36,7 @@ class AnthropicProvider:
             auth_token=None,
         )
         self._max_tokens = max_tokens
+        self._cache = CachePolicy()
 
     def close(self) -> None:
         self._client.close()
@@ -51,6 +53,7 @@ class AnthropicProvider:
             "max_tokens": self._max_tokens,
             "messages": [_anthropic_message(message) for message in messages],
             "stream": True,
+            **self._cache.params_for(model=model, messages=messages),
         }
 
         if tools:
@@ -90,6 +93,13 @@ class AnthropicProvider:
                     wrote_text = True
                     yield TextDelta(event.delta.text)
 
+            self._cache.record(
+                model=model,
+                messages=messages,
+                cache_write_tokens=cache_write_tokens,
+                cache_read_tokens=cache_read_tokens,
+            )
+
             # Cache reads and writes are input tokens too, so they count toward the total
             yield Usage(
                 input_tokens=input_tokens + cache_write_tokens + cache_read_tokens,
@@ -102,6 +112,8 @@ class AnthropicProvider:
                     output_tokens=output_tokens,
                     web_searches=web_searches,
                 ),
+                cache_read_tokens=cache_read_tokens,
+                cache_write_tokens=cache_write_tokens,
             )
 
             if stop_reason == "max_tokens":

@@ -17,6 +17,7 @@ from .base import (
     TruncatedReplyError,
     Usage,
 )
+from .caching import CachePolicy
 from .openrouter_http import CitationHttpClient
 
 WEB_SEARCH_INSTRUCTION = (
@@ -59,6 +60,8 @@ class OpenRouterProvider:
         self._max_tokens = max_tokens
         # Models that rejected effort "none". Remembered so later replies skip that request.
         self._reasoning_required: set[str] = set()
+        # Only Anthropic models need explicit cache markers here; other upstreams cache on their own
+        self._cache = CachePolicy(applies_to=_is_anthropic_model)
 
     def close(self) -> None:
         self._http.close()
@@ -95,6 +98,7 @@ class OpenRouterProvider:
             "model": model,
             "max_completion_tokens": self._max_tokens,
             "messages": [_openrouter_message(message) for message in messages],
+            **self._cache.params_for(model=model, messages=messages),
         }
 
         if "web_search" in tools:
@@ -134,12 +138,25 @@ class OpenRouterProvider:
                             yield TextDelta(choice.delta.content)
 
             if usage is not None:
+                # Cached tokens are part of prompt_tokens, as they are for Anthropic
+                details = usage.prompt_tokens_details
+                cache_read = (details.cached_tokens or 0) if details else 0
+                cache_write = (details.cache_write_tokens or 0) if details else 0
+                self._cache.record(
+                    model=model,
+                    messages=messages,
+                    cache_write_tokens=cache_write,
+                    cache_read_tokens=cache_read,
+                )
+
                 # The cost is missing from the response for some models, so it stays None then
                 cost = usage.cost if isinstance(usage.cost, (int, float)) else None
                 yield Usage(
                     input_tokens=usage.prompt_tokens,
                     output_tokens=usage.completion_tokens,
                     cost_usd=cost,
+                    cache_read_tokens=cache_read,
+                    cache_write_tokens=cache_write,
                 )
 
             if finish_reason == "length":
@@ -175,6 +192,11 @@ class OpenRouterProvider:
             for model in models
             if not model.id.endswith(":batch")
         ]
+
+
+def _is_anthropic_model(model: str) -> bool:
+    # "~anthropic/claude-sonnet-latest" is OpenRouter's alias form
+    return model.removeprefix("~").startswith("anthropic/")
 
 
 def _openrouter_message(message: dict) -> dict:

@@ -4,10 +4,13 @@ export type Source = {
 };
 
 // costUsd is null when the provider did not report a cost for the model
+// Cache counts are part of inputTokens. They are zero for replies saved before caching was tracked
 export type Usage = {
   inputTokens: number;
   outputTokens: number;
   costUsd: number | null;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
 };
 
 // Totals across a session's replies. costUsd is null when no reply has a known cost, and
@@ -18,6 +21,8 @@ export type SessionUsage = {
   costUsd: number | null;
   pricedMessages: number;
   unpricedMessages: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
 };
 
 // id is empty for a file that is still only in the prompt, before the server has saved it

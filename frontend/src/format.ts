@@ -12,3 +12,16 @@ export const formatCostShort = (usd: number) => new Intl.NumberFormat('en-US', {
   currency: 'USD',
   maximumSignificantDigits: 2,
 }).format(usd);
+
+// Share of the input tokens that were read from the prompt cache, e.g. "83%". Null when the
+// reply had no input to compare against
+export const formatCacheHit = (cacheReadTokens: number, inputTokens: number) => {
+  if (inputTokens <= 0) {
+    return null;
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    maximumFractionDigits: 0,
+  }).format(cacheReadTokens / inputTokens);
+};

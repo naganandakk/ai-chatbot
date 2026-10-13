@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { EllipsisVertical, Pause, Play, Volume2 } from 'lucide-react';
 import { speechPlayback, useSpeechPlayback } from '../speech';
 import type { Usage } from '../api';
-import { formatCost } from '../format';
+import { formatCacheHit, formatCost } from '../format';
 
 interface MoreOptionsBtnProps {
   model: string;
@@ -48,6 +48,7 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated, usage, duration
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cacheHit = usage ? formatCacheHit(usage.cacheReadTokens, usage.inputTokens) : null;
 
   // Opens the menu upward when there is not enough room below the button
   useLayoutEffect(() => {
@@ -157,6 +158,15 @@ const MoreOptionsBtn = ({ model, content, playbackId, truncated, usage, duration
                 <div>Input tokens: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.inputTokens.toLocaleString()}</span></div>
                 <div>Output tokens: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.outputTokens.toLocaleString()}</span></div>
                 <div>Cost: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.costUsd === null ? 'Unavailable' : formatCost(usage.costUsd)}</span></div>
+                {usage.cacheReadTokens > 0 && (
+                  <div>
+                    Cache hits: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.cacheReadTokens.toLocaleString()}</span>
+                    {cacheHit && <span> ({cacheHit} of input)</span>}
+                  </div>
+                )}
+                {usage.cacheWriteTokens > 0 && (
+                  <div>Cache writes: <span className="font-medium text-gray-800 dark:text-[#e3e3e3]">{usage.cacheWriteTokens.toLocaleString()}</span></div>
+                )}
               </div>
             )}
             {truncated && (

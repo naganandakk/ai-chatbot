@@ -55,6 +55,41 @@ def test_new_writes_use_the_newest_key():
     assert sealed.key_version == KeyVault([NEW_KEY]).encrypt("user-1", "anthropic", SECRET).key_version
 
 
+def test_reseal_moves_an_old_row_onto_the_current_key():
+    sealed = KeyVault([OLD_KEY]).encrypt("user-1", "anthropic", SECRET)
+    rotated = KeyVault([NEW_KEY, OLD_KEY])
+
+    resealed = rotated.reseal("user-1", "anthropic", sealed)
+
+    assert resealed.key_version == rotated.current_version
+    assert resealed.key_version != sealed.key_version
+    assert KeyVault([NEW_KEY]).decrypt("user-1", "anthropic", resealed) == SECRET
+
+
+def test_reseal_keeps_a_current_row_unchanged():
+    vault = KeyVault([NEW_KEY, OLD_KEY])
+    sealed = vault.encrypt("user-1", "anthropic", SECRET)
+
+    assert vault.reseal("user-1", "anthropic", sealed) is sealed
+
+
+def test_reseal_keeps_the_row_bound_to_its_owner_and_provider():
+    sealed = KeyVault([OLD_KEY]).encrypt("user-1", "anthropic", SECRET)
+    rotated = KeyVault([NEW_KEY, OLD_KEY])
+
+    resealed = rotated.reseal("user-1", "anthropic", sealed)
+
+    with pytest.raises(KeyVaultError):
+        rotated.decrypt("user-2", "anthropic", resealed)
+
+
+def test_reseal_fails_when_the_old_key_was_removed():
+    sealed = KeyVault([OLD_KEY]).encrypt("user-1", "anthropic", SECRET)
+
+    with pytest.raises(KeyVaultError):
+        KeyVault([NEW_KEY]).reseal("user-1", "anthropic", sealed)
+
+
 def test_row_sealed_by_a_removed_key_cannot_be_opened():
     sealed = KeyVault([OLD_KEY]).encrypt("user-1", "anthropic", SECRET)
 

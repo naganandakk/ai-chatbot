@@ -268,6 +268,19 @@ class InMemorySessionStore(SessionStore, AccountStore):
             key=lambda record: record.provider,
         )
 
+    def list_all_api_keys(self) -> list[tuple[str, ApiKeyRecord]]:
+        return [(user_id, record) for (user_id, _), record in self._api_keys.items()]
+
+    def replace_api_key_seal(
+        self, user_id: str, provider: str, expected: EncryptedKey, sealed: EncryptedKey
+    ) -> bool:
+        record = self._api_keys.get((user_id, provider))
+        if record is None or record.sealed.nonce != expected.nonce:
+            return False
+
+        self._api_keys[(user_id, provider)] = replace(record, sealed=sealed)
+        return True
+
     def delete_api_key(self, user_id: str, provider: str) -> None:
         self._api_keys.pop((user_id, provider), None)
 

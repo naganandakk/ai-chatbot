@@ -101,6 +101,19 @@ class AccountStore(ABC):
         ...
 
     @abstractmethod
+    def list_all_api_keys(self) -> list[tuple[str, ApiKeyRecord]]:
+        # Every saved key with its owner's user ID, for re-sealing after a key rotation
+        ...
+
+    @abstractmethod
+    def replace_api_key_seal(
+        self, user_id: str, provider: str, expected: EncryptedKey, sealed: EncryptedKey
+    ) -> bool:
+        # Swaps in a re-sealed value only while the row still holds `expected`, so a key the user
+        # saved in the meantime is not overwritten. Returns False when the row did not match.
+        ...
+
+    @abstractmethod
     def delete_api_key(self, user_id: str, provider: str) -> None:
         # Deleting a key that is not there is not an error
         ...

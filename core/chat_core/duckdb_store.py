@@ -418,6 +418,38 @@ class DuckDBSessionStore(SessionStore, AccountStore):
         return [_api_key_record(row) for row in rows]
 
     @_serialized
+    def list_all_api_keys(self) -> list[tuple[str, ApiKeyRecord]]:
+        rows = self.connection.execute(
+            """
+            SELECT user_id, provider, last4, updated_at, ciphertext, nonce, key_version
+            FROM user_api_keys
+            ORDER BY user_id, provider
+            """
+        ).fetchall()
+
+        return [(row[0], _api_key_record(row[1:])) for row in rows]
+
+    @_serialized
+    def replace_api_key_seal(
+        self, user_id: str, provider: str, expected: EncryptedKey, sealed: EncryptedKey
+    ) -> bool:
+        row = self.connection.execute(
+            "SELECT nonce FROM user_api_keys WHERE user_id = ? AND provider = ?",
+            [user_id, provider],
+        ).fetchone()
+        if row is None or bytes(row[0]) != expected.nonce:
+            return False
+
+        self.connection.execute(
+            """
+            UPDATE user_api_keys SET ciphertext = ?, nonce = ?, key_version = ?
+            WHERE user_id = ? AND provider = ?
+            """,
+            [sealed.ciphertext, sealed.nonce, sealed.key_version, user_id, provider],
+        )
+        return True
+
+    @_serialized
     def delete_api_key(self, user_id: str, provider: str) -> None:
         self.connection.execute(
             "DELETE FROM user_api_keys WHERE user_id = ? AND provider = ?",

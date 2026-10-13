@@ -274,6 +274,22 @@ def test_api_key_is_saved_replaced_listed_and_deleted_per_user(store):
     assert store.get_api_key(user.id, "anthropic") is None
 
 
+def test_api_key_seal_is_replaced_only_while_it_still_matches(store):
+    user = store.upsert_user("google-sub-1", "a@example.com", "Ada", "")
+    old = EncryptedKey(b"cipher-1", b"nonce-1-123456", "v1")
+    new = EncryptedKey(b"cipher-2", b"nonce-2-123456", "v2")
+    store.save_api_key(user.id, "anthropic", old, "1234")
+
+    assert store.list_all_api_keys() == [(user.id, store.get_api_key(user.id, "anthropic"))]
+    assert store.replace_api_key_seal(user.id, "anthropic", old, new) is True
+    assert store.get_api_key(user.id, "anthropic").sealed == new
+    assert store.get_api_key(user.id, "anthropic").last4 == "1234"
+
+    # The row no longer holds `old`, so a second swap from it must be refused
+    assert store.replace_api_key_seal(user.id, "anthropic", old, new) is False
+    assert store.replace_api_key_seal(user.id, "openrouter", old, new) is False
+
+
 def test_active_provider_defaults_to_none_and_can_be_changed(store):
     user = store.upsert_user("google-sub-3", "c@example.com", "Cy", "")
     assert store.get_active_provider(user.id) is None

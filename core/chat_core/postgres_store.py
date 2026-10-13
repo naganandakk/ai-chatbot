@@ -460,6 +460,39 @@ class PostgresSessionStore(SessionStore, AccountStore):
 
         return [_api_key_record(row) for row in rows]
 
+    def list_all_api_keys(self) -> list[tuple[str, ApiKeyRecord]]:
+        with self._pool.connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT user_id, provider, last4, updated_at, ciphertext, nonce, key_version
+                FROM user_api_keys
+                ORDER BY user_id, provider
+                """
+            ).fetchall()
+
+        return [(row[0], _api_key_record(row[1:])) for row in rows]
+
+    def replace_api_key_seal(
+        self, user_id: str, provider: str, expected: EncryptedKey, sealed: EncryptedKey
+    ) -> bool:
+        with self._pool.connection() as connection:
+            result = connection.execute(
+                """
+                UPDATE user_api_keys SET ciphertext = %s, nonce = %s, key_version = %s
+                WHERE user_id = %s AND provider = %s AND nonce = %s
+                """,
+                [
+                    sealed.ciphertext,
+                    sealed.nonce,
+                    sealed.key_version,
+                    user_id,
+                    provider,
+                    expected.nonce,
+                ],
+            )
+
+        return result.rowcount == 1
+
     def delete_api_key(self, user_id: str, provider: str) -> None:
         with self._pool.connection() as connection:
             connection.execute(

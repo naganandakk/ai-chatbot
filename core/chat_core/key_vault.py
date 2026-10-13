@@ -46,6 +46,10 @@ class KeyVault:
         self._ciphers = {key_version(key): AESGCM(key) for key in master_keys}
         self._current_version = key_version(master_keys[0])
 
+    @property
+    def current_version(self) -> str:
+        return self._current_version
+
     @classmethod
     def from_env(cls) -> "KeyVault":
         # Comma-separated base64 keys, newest first
@@ -86,6 +90,14 @@ class KeyVault:
             raise KeyVaultError("Stored API key could not be opened") from None
 
         return plaintext.decode()
+
+    def reseal(self, user_id: str, provider: str, sealed: EncryptedKey) -> EncryptedKey:
+        # Moves a row sealed by an older master key onto the current one. Rows already on the
+        # current key are returned unchanged.
+        if sealed.key_version == self._current_version:
+            return sealed
+
+        return self.encrypt(user_id, provider, self.decrypt(user_id, provider, sealed))
 
     def __repr__(self) -> str:
         # Never show key material, even in debugging output

@@ -133,7 +133,14 @@ Optional sign-in limits in `.env`: `ALLOWED_EMAILS` (comma-separated), `ALLOWED_
 
 The first account to sign in takes ownership of any chats that were created before accounts existed.
 
-**Rotating the encryption key:** put the new key first in `KEY_ENCRYPTION_KEYS` and keep the old one after it. New keys are sealed with the first entry, and older rows still open with the older one. Remove an old key only after its users have saved their keys again.
+**Rotating the encryption key:** put the new key first in `KEY_ENCRYPTION_KEYS` and keep the old one after it. New keys are sealed with the first entry, and older rows still open with the older one. Then move the saved keys onto the new one (stop the app first if `CHAT_STORE=duckdb`):
+
+```bash
+uv run python -m backend.app.rotate_keys --dry-run   # count rows that would move
+uv run python -m backend.app.rotate_keys             # re-seal them; exits 1 if any row cannot be opened
+```
+
+Once the run reports `failed=0`, remove the old key from `KEY_ENCRYPTION_KEYS`. A row sealed by a key that was removed cannot be recovered, and its user has to save the provider key again.
 
 ## Run locally
 

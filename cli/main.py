@@ -14,6 +14,8 @@ SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 GRAY = "\033[90m"
 RESET = "\033[0m"
 COMMANDS = ["/clear", "/model", "/new", "/quit"]
+# The CLI has no sign-in, so every chat belongs to this one local user
+LOCAL_USER_ID = "local"
 
 
 class ModelCompleter:
@@ -146,7 +148,7 @@ def format_info(reply: dict) -> str:
 def main(service: ChatService | None = None) -> None:
     store = service.store if service else InMemorySessionStore()
     service = service or ChatService(store)
-    session = store.create()
+    session = store.create(LOCAL_USER_ID)
     use_color = sys.stdout.isatty()
     # None uses the configured default model
     model: str | None = None
@@ -167,12 +169,12 @@ def main(service: ChatService | None = None) -> None:
             return
 
         if prompt == "/new":
-            session = store.create()
+            session = store.create(LOCAL_USER_ID)
             print("Started a new chat.")
             continue
 
         if prompt == "/clear":
-            store.clear(session.id)
+            store.clear(LOCAL_USER_ID, session.id)
             print("Chat history cleared.")
             continue
 
@@ -207,7 +209,7 @@ def main(service: ChatService | None = None) -> None:
         try:
             spinner.start()
             try:
-                for chunk in service.stream_reply(session.id, prompt, model):
+                for chunk in service.stream_reply(LOCAL_USER_ID, session.id, prompt, model):
                     # The CLI sends no tools, so it never gets a reset; text already printed can't be taken back
                     if isinstance(chunk, ReplyReset):
                         continue
@@ -215,7 +217,7 @@ def main(service: ChatService | None = None) -> None:
             finally:
                 spinner.stop()
 
-            reply = store.get(session.id).messages[-1].to_dict()
+            reply = store.get(LOCAL_USER_ID, session.id).messages[-1].to_dict()
             # One blank line separates the reply from its info, which is dimmed when colors are on
             print("\n")
             info = format_info(reply)

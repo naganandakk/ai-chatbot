@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api } from "../api";
+import { ApiError, api } from "../api";
 import { useAppContext } from "../Context";
 
 // Keeps the open chat in step with the /sessions/:sessionId URL, so refreshing a session URL reopens that session.
@@ -33,7 +33,8 @@ const SessionSync = () => {
         }
       })
       .catch((requestError) => {
-        if (!cancelled) {
+        // A 401 means the sign-in ended, which the auth gate handles
+        if (!cancelled && !(requestError instanceof ApiError && requestError.status === 401)) {
           notifyError(requestError instanceof Error ? requestError.message : "Could not open the session");
           navigate("/", { replace: true });
         }

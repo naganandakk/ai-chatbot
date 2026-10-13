@@ -206,6 +206,10 @@ const PromptInput = () => {
         },
       );
     } catch (requestError) {
+      if (requestError instanceof StreamError && requestError.code === "api_key_required") {
+        // Nothing was saved for this message, so the user only needs to add a key
+        navigate("/settings");
+      }
       if (requestError instanceof StreamError && requestError.session) {
         // The server kept the user's message without a reply, so show its copy of the session
         const serverSession = requestError.session;

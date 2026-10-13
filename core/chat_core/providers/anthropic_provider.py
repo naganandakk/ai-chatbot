@@ -17,6 +17,8 @@ from .base import (
 )
 from .pricing import anthropic_cost
 
+ANTHROPIC_API_URL = "https://api.anthropic.com"
+
 
 class AnthropicProvider:
     def __init__(
@@ -25,8 +27,17 @@ class AnthropicProvider:
         client: Anthropic | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> None:
-        self._client = client or Anthropic(api_key=api_key)
+        # Pinned rather than read from ANTHROPIC_BASE_URL or ANTHROPIC_AUTH_TOKEN, so a stray
+        # environment variable cannot send the user's key to another host
+        self._client = client or Anthropic(
+            api_key=api_key,
+            base_url=ANTHROPIC_API_URL,
+            auth_token=None,
+        )
         self._max_tokens = max_tokens
+
+    def close(self) -> None:
+        self._client.close()
 
     def stream(
         self,

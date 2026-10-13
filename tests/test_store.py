@@ -1,13 +1,14 @@
 from core.chat_core.store import InMemorySessionStore
+from tests.support import USER_ID
 
 
 def test_first_user_message_becomes_session_title():
     store = InMemorySessionStore()
-    session = store.create()
+    session = store.create(USER_ID)
 
-    store.add_message(session.id, "user", "How do I build a chatbot?")
+    store.add_message(USER_ID, session.id, "user", "How do I build a chatbot?")
 
-    saved_session = store.get(session.id)
+    saved_session = store.get(USER_ID, session.id)
 
     assert saved_session is not None
     assert saved_session.title == "How do I build a chatbot?"
@@ -17,12 +18,12 @@ def test_first_user_message_becomes_session_title():
 
 def test_clear_removes_messages_and_resets_title():
     store = InMemorySessionStore()
-    session = store.create()
+    session = store.create(USER_ID)
 
-    store.add_message(session.id, "user", "A question")
-    store.add_message(session.id, "assistant", "An answer")
+    store.add_message(USER_ID, session.id, "user", "A question")
+    store.add_message(USER_ID, session.id, "assistant", "An answer")
 
-    cleared_session = store.clear(session.id)
+    cleared_session = store.clear(USER_ID, session.id)
 
     assert cleared_session.messages == []
     assert cleared_session.title == "New chat"
@@ -32,7 +33,7 @@ def test_missing_session_raises_key_error():
     store = InMemorySessionStore()
 
     try:
-        store.clear("missing-session")
+        store.clear(USER_ID, "missing-session")
     except KeyError as error:
         assert str(error) == "'Session not found: missing-session'"
     else:

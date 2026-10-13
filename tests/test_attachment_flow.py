@@ -12,6 +12,7 @@ from core.chat_core.providers.openrouter_provider import _openrouter_message
 from core.chat_core.service import ChatService
 from core.chat_core.settings import Settings
 from core.chat_core.store import InMemorySessionStore
+from tests.support import USER_ID, sign_in
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 16
 
@@ -56,10 +57,10 @@ def test_files_reach_provider_as_blocks_before_the_text():
     store = InMemorySessionStore()
     provider = FakeProvider()
     service = make_service(store, provider)
-    session = store.create()
+    session = store.create(USER_ID)
     files = [UploadedFile("shot.png", PNG), UploadedFile("notes.txt", b"hello")]
 
-    drain(service.stream_reply(session.id, "What is this?", files=files))
+    drain(service.stream_reply(USER_ID, session.id, "What is this?", files=files))
 
     content = provider.calls[0]["messages"][0]["content"]
     assert content[0] == {
@@ -76,11 +77,11 @@ def test_attachment_only_message_is_allowed():
     store = InMemorySessionStore()
     provider = FakeProvider()
     service = make_service(store, provider)
-    session = store.create()
+    session = store.create(USER_ID)
 
-    _, reply = drain(service.stream_reply(session.id, "  ", files=[UploadedFile("a.png", PNG)]))
+    _, reply = drain(service.stream_reply(USER_ID, session.id, "  ", files=[UploadedFile("a.png", PNG)]))
 
-    saved = store.get(session.id).messages[0]
+    saved = store.get(USER_ID, session.id).messages[0]
     assert saved.content == ""
     assert len(saved.attachments) == 1
     assert reply.content == "Got it"
@@ -91,10 +92,10 @@ def test_earlier_attachments_are_resent_on_later_turns():
     store = InMemorySessionStore()
     provider = FakeProvider()
     service = make_service(store, provider)
-    session = store.create()
-    drain(service.stream_reply(session.id, "Look", files=[UploadedFile("a.png", PNG)]))
+    session = store.create(USER_ID)
+    drain(service.stream_reply(USER_ID, session.id, "Look", files=[UploadedFile("a.png", PNG)]))
 
-    drain(service.stream_reply(session.id, "Again"))
+    drain(service.stream_reply(USER_ID, session.id, "Again"))
 
     history = provider.calls[1]["messages"]
     assert history[0]["content"][0]["data"] == PNG
@@ -105,12 +106,12 @@ def test_earlier_attachments_are_resent_on_later_turns():
 def test_rejected_upload_saves_nothing():
     store = InMemorySessionStore()
     service = make_service(store)
-    session = store.create()
+    session = store.create(USER_ID)
 
     with pytest.raises(ValueError, match="not a supported file"):
-        drain(service.stream_reply(session.id, "Hi", files=[UploadedFile("tool.exe", b"MZ")]))
+        drain(service.stream_reply(USER_ID, session.id, "Hi", files=[UploadedFile("tool.exe", b"MZ")]))
 
-    assert store.get(session.id).messages == []
+    assert store.get(USER_ID, session.id).messages == []
 
 
 def test_anthropic_provider_sends_base64_image_and_document_blocks():
@@ -168,7 +169,7 @@ def client(monkeypatch):
     store = InMemorySessionStore()
     limits = AttachmentLimits.from_env()
     app = create_app(store=store, chat_service=make_service(store, limits=limits))
-    return app.test_client()
+    return sign_in(app.test_client())
 
 
 def upload(client, session_id, files, message="Hi"):

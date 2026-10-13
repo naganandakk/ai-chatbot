@@ -1,10 +1,11 @@
 from backend.app import create_app
 from core.chat_core.store import InMemorySessionStore
+from tests.support import USER_ID, sign_in
 
 
 def test_create_and_list_sessions():
     app = create_app()
-    client = app.test_client()
+    client = sign_in(app.test_client())
 
     created_response = client.post("/api/sessions")
 
@@ -27,7 +28,7 @@ def test_create_and_list_sessions():
 
 def test_get_and_clear_session():
     app = create_app()
-    client = app.test_client()
+    client = sign_in(app.test_client())
 
     created_session = client.post("/api/sessions").get_json()
     session_id = created_session["id"]
@@ -46,7 +47,7 @@ def test_get_and_clear_session():
 
 def test_get_missing_session_returns_not_found():
     app = create_app()
-    client = app.test_client()
+    client = sign_in(app.test_client())
 
     response = client.get("/api/sessions/does-not-exist")
 
@@ -55,15 +56,15 @@ def test_get_missing_session_returns_not_found():
 
 def test_session_response_includes_usage_totals_but_list_does_not():
     store = InMemorySessionStore()
-    session = store.create()
-    store.add_message(
+    session = store.create(USER_ID)
+    store.add_message(USER_ID,
         session.id,
         "assistant",
         "Hi",
         model="claude-sonnet-5-5",
         usage='{"input_tokens": 12, "output_tokens": 5, "cost_usd": 0.5}',
     )
-    client = create_app(store=store).test_client()
+    client = sign_in(create_app(store=store).test_client())
 
     get_body = client.get(f"/api/sessions/{session.id}").get_json()
     list_body = client.get("/api/sessions").get_json()

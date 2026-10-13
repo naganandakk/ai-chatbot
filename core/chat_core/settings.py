@@ -13,6 +13,16 @@ API_KEY_NAMES = {
     "openrouter": "OPENROUTER_API_KEY",
 }
 
+DEFAULT_MODELS = {
+    "anthropic": "claude-haiku-4-5",
+    "openrouter": "anthropic/claude-haiku-4.5",
+}
+
+
+def default_model(provider: str) -> str:
+    # CLAUDE_MODEL overrides the default for whichever provider is in use
+    return os.getenv("CLAUDE_MODEL", DEFAULT_MODELS[provider])
+
 
 def api_key_from_env(provider: str) -> str:
     key_name = API_KEY_NAMES[provider]
@@ -43,12 +53,7 @@ class Settings:
 
         api_key = api_key_from_env(provider)
 
-        default_model = (
-            "anthropic/claude-haiku-4.5"
-            if provider == "openrouter"
-            else "claude-haiku-4-5"
-        )
-        model = os.getenv("CLAUDE_MODEL", default_model)
+        model = default_model(provider)
         database_path = os.getenv("CHAT_DATABASE_PATH", "data/chat.duckdb")
         max_tokens = _max_tokens_from_env()
 

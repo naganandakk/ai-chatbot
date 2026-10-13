@@ -2,8 +2,10 @@ import json
 from types import SimpleNamespace
 
 from backend.app import create_app
+from core.chat_core.key_vault import KeyVault
 from core.chat_core.providers import AnthropicProvider, ModelInfo, OpenRouterProvider, ProviderError
 from core.chat_core.store import InMemorySessionStore
+from tests.support import USER_ID, sign_in
 
 
 class FakeModels:
@@ -55,15 +57,28 @@ class RecordingProvider:
         return self.models
 
 
+def save_key(store, provider: str, api_key: str, user_id: str = USER_ID) -> None:
+    sealed = KeyVault.from_env().encrypt(user_id, provider, api_key)
+    store.save_api_key(user_id, provider, sealed, api_key[-4:])
+
+
+def patch_provider_factory(monkeypatch, make_provider):
+    # Provider construction is the only thing replaced; the key is still read from the store
+    calls: list[tuple[str, str]] = []
+
+    def fake_create(provider_name: str, api_key: str, max_tokens: int = 0):
+        calls.append((provider_name, api_key))
+        return make_provider(provider_name)
+
+    monkeypatch.setattr("core.chat_core.provider_pool.create_provider_for", fake_create)
+    return calls
+
+
 def test_models_endpoint_lists_requested_provider(monkeypatch):
-    calls: list[str] = []
-
-    def fake_create(provider_name: str):
-        calls.append(provider_name)
-        return RecordingProvider([ModelInfo(id="m1", name="Model One")])
-
-    monkeypatch.setattr("backend.app.create_provider_by_name", fake_create)
-    client = create_app(store=InMemorySessionStore()).test_client()
+    store = InMemorySessionStore()
+    save_key(store, "openrouter", "sk-or-user-key")
+    calls = patch_provider_factory(monkeypatch, lambda name: RecordingProvider([ModelInfo(id="m1", name="Model One")]))
+    client = sign_in(create_app(store=store).test_client())
 
     response = client.get("/api/models?provider=OpenRouter")
 
@@ -72,26 +87,24 @@ def test_models_endpoint_lists_requested_provider(monkeypatch):
         "provider": "openrouter",
         "models": [{"id": "m1", "name": "Model One"}],
     }
-    assert calls == ["openrouter"]
+    assert calls == [("openrouter", "sk-or-user-key")]
 
 
 def test_models_endpoint_defaults_to_configured_provider(monkeypatch):
-    calls: list[str] = []
+    store = InMemorySessionStore()
+    save_key(store, "anthropic", "sk-ant-user-key")
     monkeypatch.setenv("AI_PROVIDER", "anthropic")
-    monkeypatch.setattr(
-        "backend.app.create_provider_by_name",
-        lambda name: calls.append(name) or RecordingProvider([]),
-    )
-    client = create_app(store=InMemorySessionStore()).test_client()
+    calls = patch_provider_factory(monkeypatch, lambda name: RecordingProvider([]))
+    client = sign_in(create_app(store=store).test_client())
 
     response = client.get("/api/models")
 
     assert response.get_json()["provider"] == "anthropic"
-    assert calls == ["anthropic"]
+    assert calls == [("anthropic", "sk-ant-user-key")]
 
 
 def test_models_endpoint_rejects_unknown_provider():
-    client = create_app(store=InMemorySessionStore()).test_client()
+    client = sign_in(create_app(store=InMemorySessionStore()).test_client())
 
     response = client.get("/api/models?provider=nope")
 
@@ -99,21 +112,23 @@ def test_models_endpoint_rejects_unknown_provider():
     assert "Unknown provider: nope" in response.get_json()["error"]
 
 
-def test_models_endpoint_reports_missing_api_key(monkeypatch):
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    client = create_app(store=InMemorySessionStore()).test_client()
+def test_models_endpoint_asks_for_a_key_when_the_user_has_none(monkeypatch):
+    store = InMemorySessionStore()
+    save_key(store, "openrouter", "sk-or-someone-elses-key", user_id="other-user")
+    patch_provider_factory(monkeypatch, lambda name: RecordingProvider([]))
+    client = sign_in(create_app(store=store).test_client())
 
     response = client.get("/api/models?provider=openrouter")
 
-    assert response.status_code == 400
-    assert response.get_json() == {
-        "error": "OPENROUTER_API_KEY is required for the openrouter provider",
-    }
+    assert response.status_code == 409
+    assert response.get_json()["code"] == "api_key_required"
 
 
 def test_models_endpoint_maps_upstream_failure_to_bad_gateway(monkeypatch):
-    monkeypatch.setattr("backend.app.create_provider_by_name", lambda name: FailingProvider())
-    client = create_app(store=InMemorySessionStore()).test_client()
+    store = InMemorySessionStore()
+    save_key(store, "anthropic", "sk-ant-user-key")
+    patch_provider_factory(monkeypatch, lambda name: FailingProvider())
+    client = sign_in(create_app(store=store).test_client())
 
     response = client.get("/api/models?provider=anthropic")
 

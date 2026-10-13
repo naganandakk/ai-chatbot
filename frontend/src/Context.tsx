@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { ChatSession, SessionSummary } from "./api";
+import { ChatSession, CurrentUser, SessionSummary, SIGNED_OUT_EVENT, api, restoreSession, sessionEvents } from "./api";
+
+export type AuthStatus = "loading" | "anonymous" | "authenticated";
 
 type NotificationVariant = "error" | "success";
 
@@ -68,6 +70,10 @@ interface AppContextValue {
   notifyError: (message: string) => void;
   notifySuccess: (message: string) => void;
   dismissNotification: (id: string) => void;
+  authStatus: AuthStatus;
+  currentUser: CurrentUser | null;
+  signIn: (user: CurrentUser) => void;
+  signOut: () => Promise<void>;
 }
 
 export const Context = createContext<AppContextValue | null>(null);
@@ -141,6 +147,59 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const notifyError = useCallback((message: string) => pushNotification(message, "error"), [pushNotification]);
   const notifySuccess = useCallback((message: string) => pushNotification(message, "success"), [pushNotification]);
 
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  const clearSignedInState = useCallback(() => {
+    setCurrentUser(null);
+    setAuthStatus("anonymous");
+    setActiveSession(null);
+    setSessions([]);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    restoreSession()
+      .then((user) => {
+        if (cancelled) {
+          return;
+        }
+        setCurrentUser(user);
+        setAuthStatus(user ? "authenticated" : "anonymous");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAuthStatus("anonymous");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // The API client reports here when the session cannot be renewed
+    const handleSignedOut = () => clearSignedInState();
+    sessionEvents.addEventListener(SIGNED_OUT_EVENT, handleSignedOut);
+    return () => sessionEvents.removeEventListener(SIGNED_OUT_EVENT, handleSignedOut);
+  }, [clearSignedInState]);
+
+  const signIn = useCallback((user: CurrentUser) => {
+    setCurrentUser(user);
+    setAuthStatus("authenticated");
+  }, []);
+
+  const signOut = useCallback(async () => {
+    try {
+      await api.signOut();
+    } catch {
+      // Even if the server call fails, this browser should stop showing the account
+    }
+    clearSignedInState();
+  }, [clearSignedInState]);
+
   return (
     <Context.Provider value={{
       sidebarOpen, setSidebarOpen,
@@ -154,7 +213,8 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
       selectedModel, selectModel,
       theme, toggleTheme,
       promptFocusRequest, requestPromptFocus,
-      notifications, notifyError, notifySuccess, dismissNotification
+      notifications, notifyError, notifySuccess, dismissNotification,
+      authStatus, currentUser, signIn, signOut
     }}>
       {children}
     </Context.Provider>

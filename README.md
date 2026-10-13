@@ -94,25 +94,46 @@ cd ..
 
 Create a `.env` file in the repository root. It is ignored by Git and must never contain placeholder values in committed files.
 
-For direct Anthropic access:
+The web app needs these to start:
+
+```env
+GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+JWT_SECRET=a_random_string_of_at_least_32_characters
+KEY_ENCRYPTION_KEYS=base64_32_byte_key
+CHAT_DATABASE_PATH=data/chat.duckdb
+```
+
+Generate `JWT_SECRET` with `openssl rand -base64 48`, and `KEY_ENCRYPTION_KEYS` with:
+
+```bash
+python -c "import secrets,base64;print(base64.b64encode(secrets.token_bytes(32)).decode())"
+```
+
+Each user adds their own Anthropic or OpenRouter API key in the app (**Settings** in the sidebar). Choose the provider in use there too; the first key you save is selected automatically.. Replies are billed to that key, so the server does not need a provider key for the web app.
+
+The terminal client has no sign-in and uses the server's own key from `.env`:
 
 ```env
 AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=your_anthropic_key
 CLAUDE_MODEL=claude-sonnet-4-5
-CHAT_DATABASE_PATH=data/chat.duckdb
 ```
 
-For OpenRouter access through the OpenRouter SDK:
-
-```env
-AI_PROVIDER=openrouter
-OPENROUTER_API_KEY=your_openrouter_key
-CLAUDE_MODEL=anthropic/claude-sonnet-4.5
-CHAT_DATABASE_PATH=data/chat.duckdb
-```
+For OpenRouter instead, set `AI_PROVIDER=openrouter` and `OPENROUTER_API_KEY`.
 
 `python-dotenv` loads `.env` for local runs. Real environment variables take precedence, so deployment secrets override local values.
+
+### Google sign-in
+
+1. In Google Cloud Console, create an OAuth client ID of type **Web application**.
+2. Under **Authorized JavaScript origins**, add each origin the app is opened from, for example `http://localhost:5173` and, for phone testing, the HTTPS LAN origin from `npm run dev:lan`. Plain `http://` LAN addresses are not accepted by Google.
+3. Put the client ID in `.env` as `GOOGLE_CLIENT_ID`, and in `frontend/.env.local` as `VITE_GOOGLE_CLIENT_ID` for the sign-in button.
+
+Optional sign-in limits in `.env`: `ALLOWED_EMAILS` (comma-separated), `ALLOWED_EMAIL_DOMAINS`, and `COOKIE_SECURE=false` for plain-HTTP runs. Cookies are `Secure` by default, so they are not sent over plain HTTP.
+
+The first account to sign in takes ownership of any chats that were created before accounts existed.
+
+**Rotating the encryption key:** put the new key first in `KEY_ENCRYPTION_KEYS` and keep the old one after it. New keys are sealed with the first entry, and older rows still open with the older one. Remove an old key only after its users have saved their keys again.
 
 ## Run locally
 
@@ -130,6 +151,8 @@ npm run dev
 ```
 
 Open the displayed Vite URL, normally `http://localhost:5173`. The Vite development server proxies browser requests from `/api` to Flask at `http://127.0.0.1:5000`.
+
+Sign-in needs `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`, and the origin you open must be listed in the Google client (see [Google sign-in](#google-sign-in)).
 
 To use voice prompts from a phone on your network, see [Use voice prompts from a phone on the local network](#use-voice-prompts-from-a-phone-on-the-local-network).
 
@@ -206,7 +229,9 @@ npm run build
 
 Deploy `frontend/dist/` to a static host, CDN, or reverse proxy. Configure it to serve the frontend and route `/api` requests to the Flask service.
 
-Set `AI_PROVIDER`, the provider-specific API key, `CLAUDE_MODEL`, the storage variables below, and optionally `TOOLS_ENABLED` through your hosting platform's secret manager. Do not upload a `.env` file to production.
+Set `GOOGLE_CLIENT_ID`, `JWT_SECRET`, `KEY_ENCRYPTION_KEYS`, the storage variables below, and optionally `TOOLS_ENABLED` through your hosting platform's secret manager. Do not upload a `.env` file to production. Provider keys are supplied by users in the app, not by the server.
+
+Sign-in cookies are `Secure`, so serve the app over HTTPS. The API uses same-origin requests only, so no CORS origins need configuring.
 
 Choose the session store with `CHAT_STORE`:
 
@@ -231,4 +256,6 @@ Keep these settings in mind:
 
 DuckDB is appropriate for one backend process. Do not run multiple Gunicorn workers or multiple application instances against the same write-enabled DuckDB file. For horizontal scaling or higher write concurrency, migrate session storage to PostgreSQL.
 
-Place Gunicorn behind an HTTPS-terminating reverse proxy. Before public release, add authentication, rate limiting, restricted CORS origins, observability, and backups.
+Place Gunicorn behind an HTTPS-terminating reverse proxy. The proxy must send `Strict-Transport-Security: max-age=31536000; includeSubDomains`, since Flask cannot see the scheme. The static host that serves `frontend/dist/` should send the same `Content-Security-Policy` that the production build puts in its meta tag (see `frontend/vite.config.ts`). Flask already sends the API headers (`no-store`, `nosniff`, frame denial, and a restrictive CSP). Key saves and deletes are recorded in the `audit_events` table, without the key. Before public release, add observability and backups.
+
+Rate limits (sign-in, token refresh, saving API keys, and sending messages) are counted in memory per process. With several Gunicorn workers each one keeps its own count, so the effective limit is the configured number times the worker count. Set `RATE_LIMIT_ENABLED=false` only for local testing.

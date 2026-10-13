@@ -74,15 +74,82 @@ export type ConfirmationMessage = {
   message: string
 }
 
+export type CurrentUser = {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+};
+
+export type ApiKeyStatus = {
+  provider: string;
+  configured: boolean;
+  last4: string | null;
+};
+
+// activeProvider is the provider the user chats with, or null until one is chosen
+export type UserSettings = {
+  activeProvider: string | null;
+  providers: ApiKeyStatus[];
+};
+
+// Carries the HTTP status and the server's machine-readable code, such as "api_key_required"
+export class ApiError extends Error {
+  status: number;
+  code: string | null;
+
+  constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+// Fired when the session cannot be renewed, so the app can send the user back to sign-in
+export const sessionEvents = new EventTarget();
+export const SIGNED_OUT_EVENT = "signed-out";
+
+// Several requests can hit an expired access token at once. They share one refresh.
+let refreshing: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  refreshing ??= fetch("/api/auth/refresh", { method: "POST" })
+    .then((response) => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
+    });
+
+  return refreshing;
+}
+
+// Sends a request, and on a 401 renews the session once and sends it again. The sign-in
+// routes are excluded, since a 401 there means the credential was refused.
+async function apiFetch(url: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(url, init);
+
+  if (response.status !== 401 || url.startsWith("/api/auth/")) {
+    return response;
+  }
+
+  if (await refreshSession()) {
+    return fetch(url, init);
+  }
+
+  sessionEvents.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+  return response;
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`/api${path}`, options);
+  const response = await apiFetch(`/api${path}`, options);
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? "Request failed");
+    throw new ApiError(body.error ?? "Request failed", response.status, body.code ?? null);
   }
 
   return response.json() as Promise<T>;
@@ -96,11 +163,13 @@ export type StreamDone = {
 // Carries the server's copy of the session when the stream fails, so the UI can reconcile
 export class StreamError extends Error {
   session: ChatSession | null;
+  code: string | null;
 
-  constructor(message: string, session: ChatSession | null) {
+  constructor(message: string, session: ChatSession | null, code: string | null = null) {
     super(message);
     this.name = "StreamError";
     this.session = session;
+    this.code = code;
   }
 }
 
@@ -130,12 +199,16 @@ async function streamMessage(
     init.body = JSON.stringify({ message, model });
   }
 
-  const response = await fetch(`/api/sessions/${sessionId}/messages`, init);
+  const response = await apiFetch(`/api/sessions/${sessionId}/messages`, init);
 
   if (!response.ok) {
     // The server explains refusals such as an oversized upload in the body
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? "Could not start the response stream");
+    throw new ApiError(
+      body.error ?? "Could not start the response stream",
+      response.status,
+      body.code ?? null,
+    );
   }
 
   if (!response.body) {
@@ -172,6 +245,7 @@ async function streamMessage(
         throw new StreamError(
           payload.message ?? "The response failed",
           payload.session ?? null,
+          payload.code ?? null,
         );
       }
 
@@ -188,6 +262,24 @@ async function streamMessage(
       return;
     }
   }
+}
+
+// Used on page load: the access token may have expired while the refresh token is still
+// valid, so renew once before deciding the user is signed out
+export async function restoreSession(): Promise<CurrentUser | null> {
+  try {
+    return await request<CurrentUser>("/auth/me");
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) {
+      throw error;
+    }
+  }
+
+  if (!(await refreshSession())) {
+    return null;
+  }
+
+  return request<CurrentUser>("/auth/me").catch(() => null);
 }
 
 export const api = {
@@ -224,6 +316,44 @@ export const api = {
 
   getAttachmentLimits: () =>
     request<AttachmentLimits>("/attachment-limits"),
+
+  me: () =>
+    request<CurrentUser>("/auth/me"),
+
+  signInWithGoogle: (credential: string) =>
+    request<CurrentUser>("/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential }),
+    }),
+
+  signOut: () =>
+    request<ConfirmationMessage>("/auth/logout", { method: "POST" }),
+
+  listApiKeys: () =>
+    request<ApiKeyStatus[]>("/me/api-keys"),
+
+  saveApiKey: (provider: string, apiKey: string) =>
+    request<ApiKeyStatus>(`/me/api-keys/${provider}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    }),
+
+  deleteApiKey: (provider: string) =>
+    request<ApiKeyStatus>(`/me/api-keys/${provider}`, {
+      method: "DELETE",
+    }),
+
+  getSettings: () =>
+    request<UserSettings>("/me/settings"),
+
+  updateSettings: (activeProvider: string | null) =>
+    request<UserSettings>("/me/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activeProvider }),
+    }),
 
   streamMessage,
 };

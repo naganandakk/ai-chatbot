@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, ModelOption } from "../api";
+import { useNavigate } from "react-router-dom";
+import { api, ApiError, ModelOption } from "../api";
 import { useAppContext } from "../Context";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -50,6 +51,7 @@ const ModelPicker = () => {
     isGenerating,
     notifyError
   } = useAppContext();
+  const navigate = useNavigate();
   const [models, setModels] = useState<ModelOption[]>([]);
   const [provider, setProvider] = useState<string>("");
   const [status, setStatus] = useState<LoadStatus>("loading");
@@ -77,6 +79,9 @@ const ModelPicker = () => {
           return;
         }
 
+        if (requestError instanceof ApiError && requestError.code === "api_key_required") {
+          navigate("/settings");
+        }
         setStatus("error");
         notifyError(
           requestError instanceof Error ? requestError.message : "Could not load models",

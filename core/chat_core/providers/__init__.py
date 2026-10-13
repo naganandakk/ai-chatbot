@@ -1,4 +1,4 @@
-from ..settings import DEFAULT_MAX_TOKENS, Settings, api_key_from_env
+from ..settings import DEFAULT_MAX_TOKENS, Settings
 from .anthropic_provider import AnthropicProvider
 from .base import (
     Citation,
@@ -30,14 +30,18 @@ def create_provider(settings: Settings) -> ModelProvider:
     return provider_class(api_key=settings.api_key, max_tokens=settings.max_tokens)
 
 
-def create_provider_by_name(provider_name: str) -> ModelProvider:
-    # Used when listing models for a provider that may not be the configured AI_PROVIDER
+def create_provider_for(
+    provider_name: str,
+    api_key: str,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+) -> ModelProvider:
+    # Used for keys that belong to one user, so the key is passed in rather than read from env
     provider_class = PROVIDERS.get(provider_name)
 
     if provider_class is None:
         raise RuntimeError(f"Unknown provider: {provider_name}")
 
-    return provider_class(api_key=api_key_from_env(provider_name), max_tokens=DEFAULT_MAX_TOKENS)
+    return provider_class(api_key=api_key, max_tokens=max_tokens)
 
 
 __all__ = [
@@ -56,5 +60,5 @@ __all__ = [
     "TruncatedReplyError",
     "Usage",
     "create_provider",
-    "create_provider_by_name",
+    "create_provider_for",
 ]

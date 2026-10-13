@@ -3,17 +3,18 @@ import json
 from backend.app import create_app
 from core.chat_core.providers import ProviderStreamError
 from core.chat_core.store import InMemorySessionStore, SessionStore
+from tests.support import USER_ID, sign_in
 
 
 class FakeChatService:
     def __init__(self, store: SessionStore) -> None:
         self.store = store
 
-    def stream_reply(self, session_id: str, prompt: str, model: str | None = None, files=()):
-        self.store.add_message(session_id, "user", prompt)
+    def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+        self.store.add_message(USER_ID, session_id, "user", prompt)
         yield "Hello"
         yield " world"
-        return self.store.add_message(session_id, "assistant", "Hello world", "[]", model or "")
+        return self.store.add_message(USER_ID, session_id, "assistant", "Hello world", "[]", model or "")
 
 
 def test_streaming_message_endpoint():
@@ -22,7 +23,7 @@ def test_streaming_message_endpoint():
         store=store,
         chat_service=FakeChatService(store),
     )
-    client = app.test_client()
+    client = sign_in(app.test_client())
     session = client.post("/api/sessions").get_json()
 
     response = client.post(
@@ -48,7 +49,7 @@ def test_streaming_message_endpoint():
 def test_done_event_carries_saved_reply_and_session_summary():
     store = InMemorySessionStore()
     app = create_app(store=store, chat_service=FakeChatService(store))
-    client = app.test_client()
+    client = sign_in(app.test_client())
     session = client.post("/api/sessions").get_json()
 
     body = client.post(
@@ -71,14 +72,14 @@ def test_error_event_carries_server_session_so_client_can_reconcile():
         def __init__(self, store: SessionStore) -> None:
             self.store = store
 
-        def stream_reply(self, session_id: str, prompt: str, model: str | None = None, files=()):
-            self.store.add_message(session_id, "user", prompt)
+        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+            self.store.add_message(USER_ID, session_id, "user", prompt)
             raise ProviderStreamError("Upstream overloaded")
             yield
 
     store = InMemorySessionStore()
     app = create_app(store=store, chat_service=FailingChatService(store))
-    client = app.test_client()
+    client = sign_in(app.test_client())
     session = client.post("/api/sessions").get_json()
 
     body = client.post(
@@ -100,7 +101,7 @@ def parse_event(body: str, name: str) -> dict:
 
 def test_streaming_endpoint_reports_empty_message_error():
     app = create_app()
-    client = app.test_client()
+    client = sign_in(app.test_client())
     session = client.post("/api/sessions").get_json()
 
     response = client.post(
@@ -119,12 +120,12 @@ def test_streaming_endpoint_passes_truncated_reply_message_to_client():
     from core.chat_core.providers import TruncatedReplyError
 
     class TruncatingChatService:
-        def stream_reply(self, session_id: str, prompt: str, model: str | None = None, files=()):
+        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
             raise TruncatedReplyError()
             yield
 
     app = create_app(chat_service=TruncatingChatService())
-    client = app.test_client()
+    client = sign_in(app.test_client())
     session = client.post("/api/sessions").get_json()
 
     body = client.post(
@@ -140,9 +141,9 @@ def test_done_event_carries_token_usage_and_cost():
     store = InMemorySessionStore()
 
     class UsageChatService:
-        def stream_reply(self, session_id: str, prompt: str, model: str | None = None, files=()):
-            self.store.add_message(session_id, "user", prompt)
-            return self.store.add_message(
+        def stream_reply(self, user_id: str, session_id: str, prompt: str, model: str | None = None, files=(), provider_name=None):
+            self.store.add_message(USER_ID, session_id, "user", prompt)
+            return self.store.add_message(USER_ID,
                 session_id,
                 "assistant",
                 "Hi",
@@ -156,7 +157,7 @@ def test_done_event_carries_token_usage_and_cost():
     service = UsageChatService()
     service.store = store
     app = create_app(store=store, chat_service=service)
-    client = app.test_client()
+    client = sign_in(app.test_client())
     session = client.post("/api/sessions").get_json()
 
     body = client.post(

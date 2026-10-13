@@ -7,7 +7,7 @@ import { useAppContext } from "./Context";
 export const useSessionActions = () => {
   const {
     sessions, setSessions,
-    setActiveSession,
+    activeSession, setActiveSession,
     isGenerating,
     notifyError, notifySuccess,
   } = useAppContext();
@@ -20,7 +20,10 @@ export const useSessionActions = () => {
 
     try {
       await api.deleteSession(sessionId);
-      navigate("/");
+      // Only leave the chat when it is the one open; deleting another chat keeps this one
+      if (activeSession?.id === sessionId) {
+        navigate("/");
+      }
       setSessions(prevSessions => prevSessions.filter(session => session.id !== sessionId));
       notifySuccess("Chat deleted");
     } catch (requestError) {

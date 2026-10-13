@@ -60,6 +60,9 @@ class OpenRouterProvider:
         # Models that rejected effort "none". Remembered so later replies skip that request.
         self._reasoning_required: set[str] = set()
 
+    def close(self) -> None:
+        self._http.close()
+
     def _requires_reasoning(self, model: str) -> bool:
         return (
             model in self._reasoning_required

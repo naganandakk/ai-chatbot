@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Moon, Sun
+  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Moon, Sun, Settings, LogOut
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { api, SessionSummary } from "../api";
@@ -19,7 +19,8 @@ const Sidebar = () => {
     isGenerating, setIsGenerating,
     menuOpenId, setMenuOpenId,
     editingChatId, setEditingChatId,
-    theme, toggleTheme
+    theme, toggleTheme,
+    currentUser, signOut
   } = useAppContext();
   const { deleteChat, clearChat, renameChat } = useSessionActions();
   const editingChat = sessions.find(session => session.id === editingChatId);
@@ -195,6 +196,31 @@ const Sidebar = () => {
 
         {sidebarOpen && (
           <div className="p-3 border-t border-[#dadce0]/50 dark:border-[#3c4043]/50">
+            {currentUser && (
+              <p className="px-3 pb-2 truncate text-xs text-[#5f6368] dark:text-[#9aa0a6]" title={currentUser.email}>
+                {currentUser.email}
+              </p>
+            )}
+            <button
+              onClick={() => {
+                navigate("/settings");
+                closeSidebarOnMobile();
+              }}
+              className="flex items-center gap-2 w-full rounded-full py-1 px-3 text-sm font-medium text-[#3c4043] dark:text-[#c4c7c5] hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </button>
+            <button
+              onClick={() => {
+                signOut();
+                closeSidebarOnMobile();
+              }}
+              className="flex items-center gap-2 w-full rounded-full py-1 px-3 text-sm font-medium text-[#3c4043] dark:text-[#c4c7c5] hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign out</span>
+            </button>
             <button
               onClick={() => {
                 toggleTheme();

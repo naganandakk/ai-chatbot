@@ -82,3 +82,7 @@ class ModelProvider(Protocol):
     def list_models(self) -> list[ModelInfo]:
         """Returns the models this provider's account can use, with a display name for each."""
         ...
+
+    def close(self) -> None:
+        """Releases the provider's HTTP connections. Called when the pool evicts it."""
+        ...

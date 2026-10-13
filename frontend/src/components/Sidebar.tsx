@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Moon, Sun, Settings, LogOut
+  Menu, SquarePen, MoreVertical, Edit2, Trash2, RotateCcw, Sparkles, Moon, Sun, Settings, LogOut, ChevronUp
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { api, SessionSummary } from "../api";
@@ -27,6 +27,9 @@ const Sidebar = () => {
   const chatActionsRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const [pendingConfirm, setPendingConfirm] = useState<{ action: 'delete' | 'clear'; sessionId: string } | null>(null);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [pictureFailed, setPictureFailed] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const pendingConfirmSession = sessions.find(session => session.id === pendingConfirm?.sessionId);
   // Opening a chat is done by the URL, see SessionSync
   const navigate = useNavigate();
@@ -115,6 +118,37 @@ const Sidebar = () => {
   }, [menuOpenId]);
 
   useEffect(() => {
+    if (!accountMenuOpen) {
+      return;
+    }
+    const handleClickOutside = (event: PointerEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleClickOutside, true);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [accountMenuOpen]);
+
+  useEffect(() => {
+    // The footer unmounts with the sidebar, so its menu should not reappear on reopen
+    if (!sidebarOpen) {
+      setAccountMenuOpen(false);
+    }
+  }, [sidebarOpen]);
+
+  useEffect(() => {
     // The dialogs sit outside the sidebar, so tapping them must not close the sidebar
     if (!sidebarOpen || window.innerWidth >= 768 || pendingConfirm || editingChatId) {
       return;
@@ -194,49 +228,85 @@ const Sidebar = () => {
           })}
         </div>)}
 
-        {sidebarOpen && (
-          <div className="p-3 border-t border-[#dadce0]/50 dark:border-[#3c4043]/50">
-            {currentUser && (
-              <p className="px-3 pb-2 truncate text-xs text-[#5f6368] dark:text-[#9aa0a6]" title={currentUser.email}>
-                {currentUser.email}
-              </p>
+        {sidebarOpen && currentUser && (
+          <div ref={accountMenuRef} className="relative p-3 border-t border-[#dadce0]/50 dark:border-[#3c4043]/50">
+            {accountMenuOpen && (
+              <div role="menu" className="absolute bottom-full left-3 right-3 mb-2 bg-white dark:bg-[#28292a] border border-[#dadce0] dark:border-[#3c4043] rounded-lg shadow-lg py-1 z-50">
+                <button
+                  role="menuitemcheckbox"
+                  aria-checked={theme === 'dark'}
+                  onClick={() => {
+                    toggleTheme();
+                    setAccountMenuOpen(false);
+                    closeSidebarOnMobile();
+                  }}
+                  className="flex items-center justify-between gap-2.5 w-full px-4 py-2 text-sm text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"
+                >
+                  <span className="flex items-center gap-2.5">
+                    {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                    <span>Dark mode</span>
+                  </span>
+                  <span className={`inline-flex items-center h-5 w-9 p-0.5 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#8ab4f8]' : 'bg-[#dadce0]'}`}>
+                    <span className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </span>
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    navigate("/settings");
+                    closeSidebarOnMobile();
+                  }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-[#3c4043] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#353638]"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </button>
+                <div className="my-1 border-t border-[#dadce0] dark:border-[#3c4043]" />
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    void signOut();
+                    closeSidebarOnMobile();
+                  }}
+                  className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Log out</span>
+                </button>
+              </div>
             )}
             <button
-              onClick={() => {
-                navigate("/settings");
-                closeSidebarOnMobile();
-              }}
-              className="flex items-center gap-2 w-full rounded-full py-1 px-3 text-sm font-medium text-[#3c4043] dark:text-[#c4c7c5] hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
+              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+              aria-haspopup="menu"
+              aria-expanded={accountMenuOpen}
+              className="flex items-center gap-3 w-full rounded-full py-1.5 px-2 text-left hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
             >
-              <Settings className="w-4 h-4" />
-              <span>Settings</span>
-            </button>
-            <button
-              onClick={() => {
-                signOut();
-                closeSidebarOnMobile();
-              }}
-              className="flex items-center gap-2 w-full rounded-full py-1 px-3 text-sm font-medium text-[#3c4043] dark:text-[#c4c7c5] hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign out</span>
-            </button>
-            <button
-              onClick={() => {
-                toggleTheme();
-                closeSidebarOnMobile();
-              }}
-              role="switch"
-              aria-checked={theme === 'dark'}
-              className="flex items-center justify-between w-full rounded-full py-1 px-3 text-sm font-medium text-[#3c4043] dark:text-[#c4c7c5] hover:bg-[#eef1f4] dark:hover:bg-[#2d2e30] transition-colors"
-            >
-              <span className="flex items-center gap-2">
-                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                <span>Dark mode</span>
+              {currentUser.picture && !pictureFailed ? (
+                <img
+                  src={currentUser.picture}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={() => setPictureFailed(true)}
+                  className="w-8 h-8 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex items-center justify-center w-8 h-8 shrink-0 rounded-full bg-[#e8f0fe] dark:bg-[#004a77] text-sm font-bold text-[#1a73e8] dark:text-[#c2e7ff]">
+                  {(currentUser.name || currentUser.email).charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="flex-1 min-w-0">
+                <span className="block truncate text-sm font-medium text-[#202124] dark:text-[#e3e3e3]">
+                  {currentUser.name || currentUser.email}
+                </span>
+                {currentUser.name && (
+                  <span className="block truncate text-xs text-[#5f6368] dark:text-[#9aa0a6]">
+                    {currentUser.email}
+                  </span>
+                )}
               </span>
-              <span className={`inline-flex items-center h-5 w-9 p-0.5 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#8ab4f8]' : 'bg-[#dadce0]'}`}>
-                <span className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
-              </span>
+              <ChevronUp className="w-4 h-4 shrink-0 text-[#5f6368] dark:text-[#9aa0a6]" />
             </button>
           </div>
         )}

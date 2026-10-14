@@ -21,6 +21,7 @@ dist/
 
 # Flask
 instance/
+backend/certs/
 
 # Node / frontend
 frontend/node_modules/

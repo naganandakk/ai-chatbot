@@ -157,7 +157,7 @@ cd frontend
 npm run dev
 ```
 
-Open the displayed Vite URL, normally `http://localhost:5173`. The Vite development server proxies browser requests from `/api` to Flask at `http://127.0.0.1:5000`.
+Open the displayed Vite URL, normally `http://localhost:5173`. The Vite development server proxies browser requests from `/api` to Flask at `http://127.0.0.1:5000`. If you run the API with Gunicorn instead (see [Deploy the backend](#deploy-the-backend)), it serves HTTPS locally, so start Vite with `API_TARGET=https://127.0.0.1:5000 npm run dev`.
 
 Sign-in needs `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`, and the origin you open must be listed in the Google client (see [Google sign-in](#google-sign-in)).
 
@@ -247,12 +247,16 @@ Choose the session store with `CHAT_STORE`:
 
 The Postgres tables are created on first start. To run the store contract tests against a Postgres database, set `TEST_DATABASE_URL` to a disposable database. The tests empty its tables before each check.
 
-Run the Flask application with Gunicorn:
+Run the Flask application with Gunicorn. Its settings live in `gunicorn.conf.py` at the repo root, which Gunicorn loads automatically:
 
 ```bash
 uv sync --frozen
-uv run gunicorn --workers 1 --timeout 120 --bind 0.0.0.0:5000 backend.app.wsgi:app
+uv run gunicorn backend.app.wsgi:app                                   # local: HTTPS on 127.0.0.1:5000
+APP_ENV=production GUNICORN_BIND=0.0.0.0:5000 uv run gunicorn backend.app.wsgi:app   # behind a proxy: HTTP
 ```
+
+- `APP_ENV` defaults to `local`. In local mode Gunicorn serves HTTPS with a self-signed certificate in `backend/certs/`, which it creates on the first start (the folder is ignored by git). Browsers do not trust it, but the Vite proxy accepts it. Use `APP_ENV=production` for any deployment that sits behind a proxy, so the server speaks plain HTTP.
+- `GUNICORN_BIND` sets the address (default `127.0.0.1:5000`), and `GUNICORN_WORKERS` sets the worker count (default `1`). Values in `.env` apply too. Command-line flags override the file.
 
 Keep these settings in mind:
 

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 // LAN_HTTPS=1 serves the dev server over HTTPS on the local network so phones get a secure context (microphone, voice prompts).
 // The certificate is made with mkcert; see the README. Without the flag the config is unchanged.
 const lanHttps = process.env.LAN_HTTPS === "1";
+// Flask (`flask run`) serves HTTP. Gunicorn serves HTTPS in local mode (see gunicorn.conf.py), so set API_TARGET=https://127.0.0.1:5000 when running it.
+const apiTarget = process.env.API_TARGET ?? "https://127.0.0.1:5000";
 const certDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "certs");
 const certFile = path.join(certDir, "lan.pem");
 const keyFile = path.join(certDir, "lan-key.pem");
@@ -61,8 +63,10 @@ export default defineConfig(({ command }) => ({
     }),
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:5000",
+        target: apiTarget,
         changeOrigin: true,
+        // The local Flask server uses a self-signed certificate (see gunicorn.conf.py)
+        secure: false,
       },
     },
   },

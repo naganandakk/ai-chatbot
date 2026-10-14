@@ -13,7 +13,7 @@ TEST_DATABASE_URL=postgresql:///chat_store_test uv run pytest   # also run Postg
 uv run pytest tests/test_service.py::test_stream_reply_saves_user_and_assistant_messages  # single test
 uv run ruff check .                  # lint (line-length 100, py311)
 uv run flask --app backend.app.wsgi:app run --debug --no-reload --port 5000   # API
-uv run gunicorn --workers 1 --timeout 120 --bind 127.0.0.1:5000 backend.app.wsgi:app   # production-style server
+uv run gunicorn backend.app.wsgi:app   # production-style server; settings in gunicorn.conf.py (HTTPS when APP_ENV is local, the default)
 uv run python -m cli.main            # terminal client
 ```
 

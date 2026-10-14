@@ -60,9 +60,6 @@ Match the repo's existing style, which has no type prefix such as `feat:` or `fi
 
 - **Subject:** imperative mood, 72 characters or fewer, no trailing period. Name the thing that changed, not the generic activity. Use "Add Postgres session store", not "more features". Use "Fix SSE frame split on blank lines", not "bug fixes". Avoid vague subjects like "UI improvements", "updates", and "improvements", which the recent history is full of.
 - **Body:** optional. Add it when the change spans areas or the reason isn't obvious from the diff. Wrap at 72 characters. Use short bullets, one per area, and say why, not just what.
-- **Trailer:** end the message with a blank line and this exact line:
-
-  `Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>`
 
 Examples of the target shape:
 
@@ -72,8 +69,6 @@ Add dark mode toggle to sidebar footer
 - frontend: theme state in ContextProvider, persisted under ai-chat.theme
 - frontend/components: Sidebar footer toggle with dark variants
 - tests: theme persistence has no server coverage, so none added
-
-Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
 ```
 
 ```
@@ -84,14 +79,11 @@ so retries showed a truncated reply. Save only after the stream ends.
 
 - core/chat_core/service.py: move save after the stream loop
 - tests/test_service.py: cover the failure path
-
-Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
 ```
 
 ## 5. Check before committing
 
 - The subject names a specific change, and no area in the diff is missing from the message.
-- The Co-Authored-By trailer is present and exact.
 - No secret or generated file is in the staged set.
 
 If the repo's checks are relevant to the change, run them first and say what you ran. These are from `CLAUDE.md`:
@@ -109,7 +101,6 @@ git commit -F - <<'EOF'
 
 <body>
 
-Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
 EOF
 ```
 

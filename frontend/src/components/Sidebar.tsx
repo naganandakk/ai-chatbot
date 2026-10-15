@@ -228,8 +228,9 @@ const Sidebar = () => {
           })}
         </div>)}
 
-        {sidebarOpen && currentUser && (
-          <div ref={accountMenuRef} className="relative p-3 border-t border-[#dadce0]/50 dark:border-[#3c4043]/50">
+        {/* Stays mounted while the sidebar is closed, so the avatar image is not reloaded on reopen */}
+        {currentUser && (
+          <div ref={accountMenuRef} className={`relative p-3 border-t border-[#dadce0]/50 dark:border-[#3c4043]/50 ${sidebarOpen ? '' : 'invisible'}`}>
             {accountMenuOpen && (
               <div role="menu" className="absolute bottom-full left-3 right-3 mb-2 bg-white dark:bg-[#28292a] border border-[#dadce0] dark:border-[#3c4043] rounded-lg shadow-lg py-1 z-50">
                 <button

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiKeyStatus, UserSettings } from "../api";
+import { readCache, removeCache, writeCache } from "../cache";
 import { useAppContext } from "../Context";
 import ConfirmModal from "./ConfirmModal";
 import NotificationStack from "./NotificationStack";
@@ -16,22 +17,42 @@ const labelFor = (provider: string) => PROVIDER_LABELS[provider] ?? provider;
 // Settings are a full page, so the chat keeps its place: going back returns to the same URL
 const SettingsPage = () => {
   const navigate = useNavigate();
-  const { notifySuccess, notifyError } = useAppContext();
+  const { notifySuccess, notifyError, currentUser } = useAppContext();
+  const userId = currentUser?.id ?? null;
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
+  function showSettings(next: UserSettings) {
+    setSettings(next);
+    if (userId) {
+      writeCache(userId, "settings", next);
+    }
+  }
+
+  // The model list depends on the provider and its key, so it is fetched again after either changes
+  function forgetModelList() {
+    if (userId) {
+      removeCache(userId, "models");
+    }
+  }
+
   async function loadSettings() {
     try {
-      setSettings(await api.getSettings());
+      showSettings(await api.getSettings());
     } catch (requestError) {
       notifyError(requestError instanceof Error ? requestError.message : "Could not load settings");
     }
   }
 
   useEffect(() => {
+    // The saved copy is shown at once and replaced by the server's copy when it arrives
+    const cached = userId ? readCache<UserSettings>(userId, "settings") : null;
+    if (cached) {
+      setSettings(cached.data);
+    }
     loadSettings();
   }, []);
 
@@ -50,7 +71,8 @@ const SettingsPage = () => {
 
     setBusyProvider(provider);
     try {
-      setSettings(await api.updateSettings(provider));
+      showSettings(await api.updateSettings(provider));
+      forgetModelList();
       notifySuccess(`${labelFor(provider)} is now in use`);
     } catch (requestError) {
       notifyError(requestError instanceof Error ? requestError.message : "Could not change the provider");
@@ -69,6 +91,7 @@ const SettingsPage = () => {
     setErrors((current) => ({ ...current, [provider]: "" }));
     try {
       await api.saveApiKey(provider, apiKey);
+      forgetModelList();
       setDrafts((current) => ({ ...current, [provider]: "" }));
       notifySuccess(`${labelFor(provider)} key saved`);
       await loadSettings();
@@ -87,6 +110,7 @@ const SettingsPage = () => {
     setBusyProvider(provider);
     try {
       await api.deleteApiKey(provider);
+      forgetModelList();
       notifySuccess(`${labelFor(provider)} key deleted`);
       await loadSettings();
     } catch (requestError) {

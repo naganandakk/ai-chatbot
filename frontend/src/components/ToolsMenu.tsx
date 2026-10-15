@@ -1,6 +1,7 @@
 import { Wrench } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api, Tool } from "../api";
+import { FRESH_FOR_MS, readCache, writeCache } from "../cache";
 import { useAppContext } from "../Context";
 
 // Lists the tools the server offers. Each one stays off until the user switches it on
@@ -8,7 +9,8 @@ const ToolsMenu = () => {
   const {
     selectedTools, selectTools,
     isGenerating, isLoadingSession,
-    notifyError
+    notifyError,
+    currentUser,
   } = useAppContext();
   const [tools, setTools] = useState<Tool[]>([]);
   const [showMenu, setShowMenu] = useState(false);
@@ -16,6 +18,27 @@ const ToolsMenu = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const userId = currentUser?.id ?? null;
+
+    const showTools = (list: Tool[]) => {
+      setTools(list);
+
+      // A saved tool the server no longer offers is dropped, so it cannot block sending
+      const known = new Set(list.map((tool) => tool.id));
+      const kept = selectedTools.filter((id) => known.has(id));
+      if (kept.length !== selectedTools.length) {
+        selectTools(kept);
+      }
+    };
+
+    // The server's tool list is static, so a cached copy is used for a day before asking again
+    const cached = userId ? readCache<Tool[]>(userId, "tools") : null;
+    if (cached) {
+      showTools(cached.data);
+      if (cached.ageMs < FRESH_FOR_MS.tools) {
+        return;
+      }
+    }
 
     api.listTools()
       .then((list) => {
@@ -23,13 +46,9 @@ const ToolsMenu = () => {
           return;
         }
 
-        setTools(list);
-
-        // A saved tool the server no longer offers is dropped, so it cannot block sending
-        const known = new Set(list.map((tool) => tool.id));
-        const kept = selectedTools.filter((id) => known.has(id));
-        if (kept.length !== selectedTools.length) {
-          selectTools(kept);
+        showTools(list);
+        if (userId) {
+          writeCache(userId, "tools", list);
         }
       })
       .catch((requestError) => {

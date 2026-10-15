@@ -4,7 +4,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { checkAttachments, formatFileSize } from "../attachments";
-import { api, AttachmentLimits, ChatSession, Message, SessionSummary, StreamError } from "../api";
+import { api, AttachmentLimits, ChatSession, Message, SessionSummary, StreamError, summarize } from "../api";
+import { FRESH_FOR_MS, readCache, writeCache } from "../cache";
 import { useAppContext } from "../Context";
 import { useIsDesktop } from "../useIsDesktop";
 import { useVoiceInput } from "../voiceInput";
@@ -15,13 +16,14 @@ import VoiceInputBtn from "./VoiceInputBtn";
 const PromptInput = () => {
   const {
     activeSession, setActiveSession,
-    sessions, setSessions,
+    setSessions,
     isLoadingSession,
     isGenerating, setIsGenerating,
     inputMessage, setInputMessage,
     selectedModel, selectedTools,
     promptFocusRequest,
-    notifyError
+    notifyError,
+    currentUser,
   } = useAppContext();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,8 +38,23 @@ const PromptInput = () => {
   });
 
   useEffect(() => {
+    const userId = currentUser?.id ?? null;
+    // The limits come from server settings that rarely change, so a cached copy is used for a day
+    const cached = userId ? readCache<AttachmentLimits>(userId, "limits") : null;
+    if (cached) {
+      setLimits(cached.data);
+      if (cached.ageMs < FRESH_FOR_MS.limits) {
+        return;
+      }
+    }
+
     api.getAttachmentLimits()
-      .then(setLimits)
+      .then((next) => {
+        setLimits(next);
+        if (userId) {
+          writeCache(userId, "limits", next);
+        }
+      })
       .catch(() => {
         // Without the limits the picker accepts any file, and the server checks each upload
       });
@@ -74,7 +91,7 @@ const PromptInput = () => {
     try {
       const session = await api.createSession();
       setActiveSession(session);
-      setSessions([...sessions, session])
+      upsertSessionSummary(summarize(session));
     } catch (requestError) {
       notifyError(
         requestError instanceof Error
@@ -216,12 +233,7 @@ const PromptInput = () => {
         // The server kept the user's message without a reply, so show its copy of the session
         const serverSession = requestError.session;
         setActiveSession(serverSession);
-        upsertSessionSummary({
-          id: serverSession.id,
-          title: serverSession.title,
-          createdAt: serverSession.createdAt,
-          updatedAt: serverSession.updatedAt,
-        });
+        upsertSessionSummary(summarize(serverSession));
       } else {
         // Drop the empty assistant placeholder so no copy or sources buttons are left behind
         setActiveSession((currentSession) => {

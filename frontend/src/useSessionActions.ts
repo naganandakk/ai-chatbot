@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { api } from "./api";
+import { removeCache } from "./cache";
 import { useAppContext } from "./Context";
 
 // Rename, clear, and delete for a session, shared by the sidebar and the header menu.
@@ -10,6 +11,7 @@ export const useSessionActions = () => {
     activeSession, setActiveSession,
     isGenerating,
     notifyError, notifySuccess,
+    currentUser,
   } = useAppContext();
   const navigate = useNavigate();
 
@@ -20,6 +22,9 @@ export const useSessionActions = () => {
 
     try {
       await api.deleteSession(sessionId);
+      if (currentUser) {
+        removeCache(currentUser.id, `session.${sessionId}`);
+      }
       // Only leave the chat when it is the one open; deleting another chat keeps this one
       if (activeSession?.id === sessionId) {
         navigate("/");
@@ -41,7 +46,16 @@ export const useSessionActions = () => {
     }
 
     try {
-      setActiveSession(await api.clearChatHistory(sessionId));
+      const cleared = await api.clearChatHistory(sessionId);
+      setActiveSession(cleared);
+      // The cleared chat has a new title and updatedAt, which the sidebar entry must match
+      setSessions(prevSessions =>
+        prevSessions.map(session =>
+          session.id === sessionId
+            ? { ...session, title: cleared.title, updatedAt: cleared.updatedAt }
+            : session
+        )
+      );
       notifySuccess("Chat history cleared");
     } catch (requestError) {
       notifyError(
@@ -60,12 +74,13 @@ export const useSessionActions = () => {
     }
 
     try {
-      await api.renameSession(sessionId, trimmedTitle);
+      // Renaming moves updatedAt on the server, so the sidebar entry takes the response's copy
+      const renamed = await api.renameSession(sessionId, trimmedTitle);
       notifySuccess("Chat renamed");
       setSessions(prevSessions =>
         prevSessions.map((session) =>
           session.id === sessionId
-            ? { ...session, title: trimmedTitle }
+            ? { ...session, title: trimmedTitle, updatedAt: renamed.updatedAt }
             : session
         )
       );

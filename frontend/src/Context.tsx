@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { ChatSession, CurrentUser, SessionSummary, SIGNED_OUT_EVENT, api, restoreSession, sessionEvents } from "./api";
+import { clearCache, readCache, writeCache, writeSessionCache } from "./cache";
 
 export type AuthStatus = "loading" | "anonymous" | "authenticated";
 
@@ -174,12 +175,37 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
+  // Sign-out removes every cached value, so nothing from this account stays in the browser
   const clearSignedInState = useCallback(() => {
+    clearCache();
     setCurrentUser(null);
     setAuthStatus("anonymous");
     setActiveSession(null);
     setSessions([]);
   }, []);
+
+  // Shows the signed-in user's cached session list at once, while the sidebar asks the server for the current one
+  const hydrateUser = useCallback((user: CurrentUser) => {
+    // Values left by another account in this browser are removed, and this user's are kept
+    clearCache(user.id);
+    setSessions(readCache<SessionSummary[]>(user.id, "sessions")?.data ?? []);
+    setCurrentUser(user);
+    setAuthStatus("authenticated");
+  }, []);
+
+  // Saved in the same batch as the user, so the list is never written back empty for a signed-in user
+  useEffect(() => {
+    if (currentUser) {
+      writeCache(currentUser.id, "sessions", sessions);
+    }
+  }, [sessions, currentUser]);
+
+  // Streamed text changes the open chat on every chunk, so the chat is saved once the reply is done
+  useEffect(() => {
+    if (currentUser && activeSession && !isGenerating) {
+      writeSessionCache(currentUser.id, activeSession);
+    }
+  }, [activeSession, isGenerating, currentUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,8 +215,12 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
         if (cancelled) {
           return;
         }
-        setCurrentUser(user);
-        setAuthStatus(user ? "authenticated" : "anonymous");
+        if (user) {
+          hydrateUser(user);
+        } else {
+          setCurrentUser(null);
+          setAuthStatus("anonymous");
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -211,9 +241,8 @@ export const ContextProvider = ({ children }: { children: React.ReactNode }) => 
   }, [clearSignedInState]);
 
   const signIn = useCallback((user: CurrentUser) => {
-    setCurrentUser(user);
-    setAuthStatus("authenticated");
-  }, []);
+    hydrateUser(user);
+  }, [hydrateUser]);
 
   const signOut = useCallback(async () => {
     try {

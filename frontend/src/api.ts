@@ -185,6 +185,16 @@ export class StreamError extends Error {
   }
 }
 
+// The sidebar list holds summaries only, so the messages are left out
+export function summarize(session: ChatSession): SessionSummary {
+  return {
+    id: session.id,
+    title: session.title,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+  };
+}
+
 export function attachmentUrl(attachmentId: string): string {
   return `/api/attachments/${attachmentId}`;
 }

@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ApiError, api } from "../api";
+import { ApiError, ChatSession, api } from "../api";
+import { readCache } from "../cache";
 import { useAppContext } from "../Context";
 
 // Keeps the open chat in step with the /sessions/:sessionId URL, so refreshing a session URL reopens that session.
@@ -8,18 +9,29 @@ import { useAppContext } from "../Context";
 const SessionSync = () => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const { activeSession, setActiveSession, setIsLoadingSession, notifyError } = useAppContext();
-  // Read by the effect below, so a change to the open chat does not re-run the load
-  const activeSessionIdRef = useRef<string | null>(null);
-  activeSessionIdRef.current = activeSession?.id ?? null;
+  const {
+    activeSession, setActiveSession, setIsLoadingSession, notifyError,
+    sessions, currentUser,
+  } = useAppContext();
+  // The sidebar list says when each chat last changed. The effect re-runs when that changes, so a chat
+  // updated elsewhere is fetched again
+  const summary = sessions.find((session) => session.id === sessionId);
+  const summaryUpdatedAt = summary?.updatedAt;
 
   useEffect(() => {
     if (!sessionId) {
       setActiveSession(null);
       return;
     }
-    // The chat is already open, e.g. right after a new chat was created and its URL was set
-    if (activeSessionIdRef.current === sessionId) {
+    // The chat is already open at its latest version, e.g. right after a new chat was created and its URL was set
+    if (activeSession?.id === sessionId && (!summary || activeSession.updatedAt === summary.updatedAt)) {
+      return;
+    }
+
+    // A copy saved at the same updatedAt as the list is the current chat, so the server is not asked again
+    const cached = currentUser && summary ? readCache<ChatSession>(currentUser.id, `session.${sessionId}`) : null;
+    if (cached && summary && cached.data.updatedAt === summary.updatedAt) {
+      setActiveSession({ ...cached.data, title: summary.title });
       return;
     }
 
@@ -49,7 +61,7 @@ const SessionSync = () => {
       cancelled = true;
       setIsLoadingSession(false);
     };
-  }, [sessionId]);
+  }, [sessionId, summaryUpdatedAt]);
 
   return null;
 };

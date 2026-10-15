@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from "react-router-dom";
-import { api, ApiError, ModelOption } from "../api";
+import { api, ApiError, ModelList, ModelOption } from "../api";
+import { FRESH_FOR_MS, readCache, writeCache } from "../cache";
 import { useAppContext } from "../Context";
 
 type LoadStatus = "loading" | "ready" | "error";
@@ -49,7 +50,8 @@ const ModelPicker = () => {
   const {
     selectedModel, selectModel,
     isGenerating,
-    notifyError
+    notifyError,
+    currentUser,
   } = useAppContext();
   const navigate = useNavigate();
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -58,6 +60,27 @@ const ModelPicker = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const userId = currentUser?.id ?? null;
+
+    const showList = (list: ModelList) => {
+      setModels(list.models);
+      setProvider(list.provider);
+      setStatus("ready");
+
+      // A saved model the provider no longer offers falls back to the first one
+      if (!list.models.some((model) => model.id === selectedModel)) {
+        selectModel(list.models[0]?.id ?? "");
+      }
+    };
+
+    // The list only changes when the provider or its key changes, and Settings clears it then
+    const cached = userId ? readCache<ModelList>(userId, "models") : null;
+    if (cached) {
+      showList(cached.data);
+      if (cached.ageMs < FRESH_FOR_MS.models) {
+        return;
+      }
+    }
 
     api.listModels()
       .then((list) => {
@@ -65,13 +88,9 @@ const ModelPicker = () => {
           return;
         }
 
-        setModels(list.models);
-        setProvider(list.provider);
-        setStatus("ready");
-
-        // A saved model the provider no longer offers falls back to the first one
-        if (!list.models.some((model) => model.id === selectedModel)) {
-          selectModel(list.models[0]?.id ?? "");
+        showList(list);
+        if (userId) {
+          writeCache(userId, "models", list);
         }
       })
       .catch((requestError) => {

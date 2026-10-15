@@ -2,6 +2,8 @@
 
 A responsive chat application built with Flask, the Anthropic Python SDK, React, and TypeScript. It supports direct Anthropic access through the Anthropic SDK and OpenRouter through the OpenRouter SDK.
 
+Production: https://ai-chatbot-omega-ecru.vercel.app
+
 ## Features
 
 - Create, switch, and clear chat sessions

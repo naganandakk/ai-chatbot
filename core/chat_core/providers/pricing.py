@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-# Anthropic does not return a dollar cost, so it is worked out from token counts. Prices are
-# from Anthropic's pricing page and must be updated by hand when they change. A model that is
-# not listed reports its tokens with no cost.
+# Anthropic and OpenAI do not return a dollar cost, so it is worked out from token counts. Prices
+# are from each provider's pricing page and must be updated by hand when they change. A model
+# that is not listed reports its tokens with no cost.
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,41 @@ LONG_PROMPT_RATES: dict[str, Rates] = {
 
 # $10 per 1,000 web searches
 WEB_SEARCH_USD = 0.01
+
+# Standard (not batch or priority) rates. OpenAI has no cache write charge. Only models whose
+# rates were confirmed are listed. Dated snapshots such as "gpt-4o-mini-2024-07-18" are unlisted.
+OPENAI_RATES: dict[str, Rates] = {
+    "gpt-4o-mini": Rates(input=0.15, cache_write=0, cache_read=0.075, output=0.6),
+    "gpt-4o": Rates(input=2.5, cache_write=0, cache_read=1.25, output=10),
+    "gpt-4.1": Rates(input=2, cache_write=0, cache_read=0.5, output=8),
+    "gpt-4.1-mini": Rates(input=0.4, cache_write=0, cache_read=0.1, output=1.6),
+    "gpt-4.1-nano": Rates(input=0.1, cache_write=0, cache_read=0.025, output=0.4),
+    "gpt-5": Rates(input=1.25, cache_write=0, cache_read=0.125, output=10),
+    "gpt-5-mini": Rates(input=0.25, cache_write=0, cache_read=0.025, output=2),
+    "gpt-5-nano": Rates(input=0.05, cache_write=0, cache_read=0.005, output=0.4),
+}
+
+
+def openai_cost(
+    model: str,
+    *,
+    input_tokens: int,
+    cached_tokens: int,
+    output_tokens: int,
+) -> float | None:
+    # input_tokens is the whole prompt, and cached_tokens is the part of it served from cache
+    rates = OPENAI_RATES.get(model)
+    if rates is None:
+        return None
+
+    uncached_tokens = input_tokens - cached_tokens
+    token_cost = (
+        uncached_tokens * rates.input
+        + cached_tokens * rates.cache_read
+        + output_tokens * rates.output
+    ) / 1_000_000
+
+    return token_cost
 
 
 def anthropic_cost(

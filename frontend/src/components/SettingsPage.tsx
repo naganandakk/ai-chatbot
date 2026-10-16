@@ -9,6 +9,7 @@ import NotificationStack from "./NotificationStack";
 
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
+  openai: "OpenAI",
   openrouter: "OpenRouter",
 };
 

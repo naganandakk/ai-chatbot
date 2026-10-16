@@ -13,10 +13,12 @@ from .base import (
     TruncatedReplyError,
     Usage,
 )
+from .openai_provider import OpenAIProvider
 from .openrouter_provider import OpenRouterProvider
 
 PROVIDERS: dict[str, type[ModelProvider]] = {
     "anthropic": AnthropicProvider,
+    "openai": OpenAIProvider,
     "openrouter": OpenRouterProvider,
 }
 
@@ -50,6 +52,7 @@ __all__ = [
     "Citation",
     "ModelInfo",
     "ModelProvider",
+    "OpenAIProvider",
     "OpenRouterProvider",
     "ProviderError",
     "ProviderEvent",

@@ -1,6 +1,6 @@
 import pytest
 
-from core.chat_core.providers.pricing import anthropic_cost
+from core.chat_core.providers.pricing import anthropic_cost, openai_cost
 
 
 def test_cost_counts_input_cache_output_and_searches():
@@ -49,3 +49,19 @@ def test_haiku_prompts_over_100k_tokens_use_long_prompt_rates():
     # 100,000 tokens at $0.10 per million, versus 100,001 tokens billed at the long-prompt rate
     assert short == pytest.approx(0.01)
     assert long == pytest.approx(90_000 * 0.5 / 1e6 + 10_001 * 0.05 / 1e6)
+
+
+def test_openai_cost_bills_cached_prompt_tokens_at_the_cache_rate():
+    cost = openai_cost(
+        "gpt-4o-mini",
+        input_tokens=1_000_000,
+        cached_tokens=400_000,
+        output_tokens=1_000_000,
+    )
+
+    # 600,000 uncached at $0.15, 400,000 cached at $0.075, and 1,000,000 output at $0.60
+    assert cost == pytest.approx(0.09 + 0.03 + 0.60)
+
+
+def test_unknown_openai_model_has_no_cost():
+    assert openai_cost("gpt-unlisted", input_tokens=10, cached_tokens=0, output_tokens=10) is None

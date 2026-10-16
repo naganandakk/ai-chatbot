@@ -10,11 +10,13 @@ DEFAULT_MAX_TOKENS = 8192
 
 API_KEY_NAMES = {
     "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
 }
 
 DEFAULT_MODELS = {
     "anthropic": "claude-haiku-4-5",
+    "openai": "gpt-4o-mini",
     "openrouter": "anthropic/claude-haiku-4.5",
 }
 
@@ -48,7 +50,7 @@ class Settings:
 
         if provider not in API_KEY_NAMES:
             raise RuntimeError(
-                "AI_PROVIDER must be set to 'anthropic' or 'openrouter'"
+                "AI_PROVIDER must be set to 'anthropic', 'openai' or 'openrouter'"
             )
 
         api_key = api_key_from_env(provider)

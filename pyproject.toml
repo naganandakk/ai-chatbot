@@ -17,6 +17,7 @@ dependencies = [
   "cryptography>=43",
   "requests>=2.34.2",
   "flask-limiter>=4.1.1",
+  "openai>=3.31.0",
 ]
 
 [dependency-groups]

@@ -59,6 +59,7 @@ def test_listing_shows_status_per_provider_without_the_key(monkeypatch):
     assert SENTINEL_KEY not in body
     assert response.get_json() == [
         {"provider": "anthropic", "configured": True, "last4": "1234"},
+        {"provider": "openai", "configured": False, "last4": None},
         {"provider": "openrouter", "configured": False, "last4": None},
     ]
 

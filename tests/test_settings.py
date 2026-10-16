@@ -27,12 +27,24 @@ def test_loads_openrouter_settings(monkeypatch):
     assert settings.model == "anthropic/claude-haiku-4.5"
 
 
+def test_loads_openai_settings(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.delenv("CLAUDE_MODEL", raising=False)
+
+    settings = Settings.from_env()
+
+    assert settings.provider == "openai"
+    assert settings.api_key == "openai-key"
+    assert settings.model == "gpt-4o-mini"
+
+
 def test_rejects_missing_provider(monkeypatch):
     monkeypatch.delenv("AI_PROVIDER", raising=False)
 
     with pytest.raises(
         RuntimeError,
-        match="AI_PROVIDER must be set to 'anthropic' or 'openrouter'",
+        match="AI_PROVIDER must be set to 'anthropic', 'openai' or 'openrouter'",
     ):
         Settings.from_env()
 
